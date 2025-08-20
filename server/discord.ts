@@ -487,6 +487,70 @@ export class DiscordService {
     console.log('✅ Voice service connected to Discord service');
   }
 
+  /**
+   * Setup voice processing for a connection
+   */
+  private setupVoiceProcessing(connection: VoiceConnection, guildId: string) {
+    try {
+      console.log('🎤 Setting up voice processing...');
+      
+      // Import required voice components
+      const { createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior } = require('@discordjs/voice');
+      
+      // Create audio player
+      const player = createAudioPlayer({
+        behaviors: {
+          noSubscriber: NoSubscriberBehavior.Play
+        }
+      });
+
+      // Subscribe to voice connection
+      connection.subscribe(player);
+
+      // Listen for voice data
+      connection.receiver.speaking.on('start', (userId: string) => {
+        console.log(`🎤 User ${userId} started speaking in guild ${guildId}`);
+        
+        // Create audio stream for this user
+        const audioStream = connection.receiver.subscribe(userId, {
+          end: {
+            behavior: 'manual'
+          }
+        });
+
+        // Process audio data
+        let audioBuffer: Buffer[] = [];
+        
+        audioStream.on('data', (chunk: Buffer) => {
+          audioBuffer.push(chunk);
+          console.log(`🎤 Received audio chunk from user ${userId}, buffer size: ${audioBuffer.length}`);
+        });
+
+        audioStream.on('end', async () => {
+          if (audioBuffer.length > 0) {
+            console.log(`🎤 Processing audio from user ${userId}, total chunks: ${audioBuffer.length}`);
+            
+            // Combine all audio chunks
+            const fullAudio = Buffer.concat(audioBuffer);
+            console.log(`🎤 Full audio size: ${fullAudio.length} bytes`);
+            
+            // Process with voice service
+            if (this.voiceService) {
+              await this.voiceService.processAudio(fullAudio, userId, guildId);
+            }
+            
+            // Clear buffer
+            audioBuffer = [];
+          }
+        });
+      });
+
+      console.log('✅ Voice processing setup complete');
+    } catch (error) {
+      console.error('❌ Error setting up voice processing:', error);
+    }
+  }
+
   // Join voice channel with connection limit checking
   async joinVoiceChannel(guildId: string, channelId: string): Promise<boolean> {
     try {
@@ -563,6 +627,12 @@ export class DiscordService {
           console.warn('Abort error detected - this is usually a timeout and can be ignored');
         }
       });
+
+      // Add voice processing if voice service is available
+      if (this.voiceService) {
+        console.log('🎤 Setting up voice processing for guild:', guildId);
+        this.setupVoiceProcessing(connection, guildId);
+      }
 
       this.voiceConnections.set(guildId, connection);
       console.log(`Bot joined voice channel ${voiceChannel.name} in guild ${guild.name} - streaming mode activated`);

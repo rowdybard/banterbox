@@ -101,15 +101,22 @@ export class VoiceService {
    */
   public async processAudio(audioData: Buffer, userId: string, guildId: string): Promise<void> {
     try {
+      console.log(`🎤 DEBUG: Processing audio from user ${userId}, data size: ${audioData.length} bytes`);
+      
       // Add to buffer
       this.audioBuffer.push(audioData);
+      console.log(`🎤 DEBUG: Audio buffer size now: ${this.audioBuffer.length}`);
 
       // Check if we have enough audio for processing (e.g., 3 seconds)
       if (this.audioBuffer.length >= 30) { // Assuming 10 chunks per second
+        console.log(`🎤 DEBUG: Processing audio chunk, total chunks: ${this.audioBuffer.length}`);
+        
         const audioChunk = Buffer.concat(this.audioBuffer);
         this.audioBuffer = [];
+        console.log(`🎤 DEBUG: Combined audio size: ${audioChunk.length} bytes`);
 
         // Transcribe the audio chunk
+        console.log(`🎤 DEBUG: Starting transcription...`);
         const transcription = await this.transcribeAudio(audioChunk);
         
         if (transcription) {
@@ -137,7 +144,11 @@ export class VoiceService {
             // Store regular conversation context (without wake word)
             await this.storeVoiceContext(transcription, userId, guildId, false);
           }
+        } else {
+          console.log(`🎤 DEBUG: Transcription failed or returned null`);
         }
+      } else {
+        console.log(`🎤 DEBUG: Not enough audio yet (${this.audioBuffer.length}/30 chunks)`);
       }
     } catch (error) {
       console.error('❌ Error processing audio:', error);
