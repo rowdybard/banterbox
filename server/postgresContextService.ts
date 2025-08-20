@@ -32,7 +32,7 @@ export class PostgresContextService {
       if (eventData.displayName) participants.push(eventData.displayName);
       if (eventData.username) participants.push(eventData.username);
 
-      console.log(`🔍 Context Record Debug: Recording context for userId=${userId}, eventType=${eventType}, originalMessage="${originalMessage?.substring(0, 50)}..."`);
+
       
       const [contextRecord] = await db
         .insert(contextMemory)
@@ -50,7 +50,7 @@ export class PostgresContextService {
         })
         .returning();
 
-      console.log(`🔍 Context Record Debug: Context memory recorded with ID: ${contextRecord.id} for userId: ${userId}`);
+
 
       // Clean expired context occasionally
       if (Math.random() < 0.1) {
@@ -87,11 +87,8 @@ export class PostgresContextService {
     currentMessage?: string
   ): Promise<string> {
     try {
-      console.log(`🔍 Context Internal Debug: Getting context for user ${userId}, event type ${currentEventType}, guild ${guildId}`);
-      console.log(`🔍 Context Internal Debug: Current message: "${currentMessage}"`);
       
       // Get recent context for the user, filtering by expiration
-      console.log(`🔍 Context Internal Debug: Querying database for userId=${userId}`);
       const recentContext = await db
         .select()
         .from(contextMemory)
@@ -103,27 +100,21 @@ export class PostgresContextService {
         )
         .orderBy(desc(contextMemory.createdAt))
         .limit(50);
-      
-      console.log(`🔍 Context Internal Debug: Found ${recentContext.length} context records for user ${userId}`);
-      if (recentContext.length > 0) {
-        console.log(`🔍 Context Internal Debug: Most recent context:`, {
-          id: recentContext[0].id,
-          eventType: recentContext[0].eventType,
-          originalMessage: recentContext[0].originalMessage?.substring(0, 50) + '...',
-          createdAt: recentContext[0].createdAt
-        });
-      }
 
       let processedContext = recentContext;
 
-      // TEMPORARILY: Always use context if we have any
-      let shouldUseContext = processedContext.length > 0;
+      // Smart Context Logic - Use OpenAI to determine if context is needed
+      let shouldUseContext = true;
       
-      console.log(`🔍 Context Internal Debug: processedContext.length=${processedContext.length}, currentMessage="${currentMessage}"`);
-      console.log(`🔍 Context Internal Debug: TEMPORARY - Always use context if available: ${shouldUseContext}`);
+      if (currentMessage && processedContext.length > 0) {
+        // Use OpenAI to analyze if this message needs context
+        shouldUseContext = await this.shouldUseContextWithAI(currentMessage, processedContext);
+      } else {
+        // Fallback to rule-based logic
+        shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
+      }
       
       if (!shouldUseContext) {
-        console.log('🔍 Context Internal Debug: No context available, returning empty string');
         return '';
       }
       
@@ -418,8 +409,7 @@ Response:`;
       });
 
              const result = response.choices[0]?.message?.content?.trim().toUpperCase();
-       console.log(`🔍 AI Context Decision Debug: AI response: "${result}" for message: "${currentMessage}"`);
-       console.log(`🔍 AI Context Decision Debug: Context summary: "${contextSummary}"`);
+       
        return result === 'YES';
     } catch (error) {
       console.error('Error using AI for context decision:', error);

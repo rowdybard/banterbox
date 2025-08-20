@@ -206,7 +206,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Record this interaction in context memory FIRST
       const contextualUserId = userId; // Always use Discord userId for context
-      console.log(`🔍 Context Debug: Using userId=${userId} for context`);
       let contextId: string | null = null;
       
       if (contextualUserId) {
@@ -232,7 +231,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contextString = "";
       
       if (contextualUserId) {
-        console.log(`🔍 Context Retrieval Debug: Looking for context with contextualUserId=${contextualUserId}`);
         contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId, originalMessage);
         console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
         
