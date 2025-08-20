@@ -123,25 +123,42 @@ export class VoiceService {
           console.log(`🎤 Voice transcription: "${transcription}"`);
           
           // Check for wake word
-          if (transcription.toLowerCase().includes('hey banter')) {
+          const hasWakeWord = transcription.toLowerCase().includes('hey banter');
+          console.log(`🎤 DEBUG: Wake word check - "${transcription.toLowerCase()}" includes "hey banter": ${hasWakeWord}`);
+          
+          if (hasWakeWord) {
             this.wakeWordDetected = true;
             this.transcriptionBuffer = '';
             console.log('🔔 Wake word detected!');
             
             // Store the wake word interaction
             await this.storeVoiceContext(transcription, userId, guildId, true);
+            
+            // Generate a response to the wake word
+            console.log('🎤 DEBUG: Generating response to wake word...');
+            await this.generateVoiceResponse(userId, guildId, transcription);
           } else if (this.wakeWordDetected) {
             // Continue collecting speech after wake word
             this.transcriptionBuffer += ' ' + transcription;
+            console.log(`🎤 DEBUG: Collecting speech after wake word: "${this.transcriptionBuffer}"`);
             
             // If we have enough speech or detect end of sentence, process it
             if (transcription.includes('.') || transcription.includes('?') || transcription.includes('!')) {
-              await this.storeVoiceContext(this.transcriptionBuffer.trim(), userId, guildId, false);
+              const fullMessage = this.transcriptionBuffer.trim();
+              console.log(`🎤 DEBUG: Processing complete message: "${fullMessage}"`);
+              
+              await this.storeVoiceContext(fullMessage, userId, guildId, false);
+              
+              // Generate a response to the complete message
+              console.log('🎤 DEBUG: Generating response to complete message...');
+              await this.generateVoiceResponse(userId, guildId, fullMessage);
+              
               this.wakeWordDetected = false;
               this.transcriptionBuffer = '';
             }
           } else {
             // Store regular conversation context (without wake word)
+            console.log(`🎤 DEBUG: Storing regular conversation context: "${transcription}"`);
             await this.storeVoiceContext(transcription, userId, guildId, false);
           }
         } else {
@@ -194,15 +211,19 @@ export class VoiceService {
    */
   private async transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
     try {
+      console.log(`🎤 DEBUG: Starting Whisper transcription, audio size: ${audioBuffer.length} bytes`);
+      
       const response = await openai.audio.transcriptions.create({
         file: new Blob([audioBuffer], { type: 'audio/wav' }),
         model: 'whisper-1',
         language: 'en',
       });
 
+      console.log(`🎤 DEBUG: Whisper transcription result: "${response.text}"`);
       return response.text;
     } catch (error) {
       console.error('❌ Whisper transcription failed:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
       return null;
     }
   }
@@ -314,6 +335,49 @@ export class VoiceService {
     } catch (error) {
       console.error('❌ Error checking whitelist:', error);
       return false;
+    }
+  }
+
+  /**
+   * Generate a voice response using the banter system
+   */
+  private async generateVoiceResponse(userId: string, guildId: string, message: string): Promise<void> {
+    try {
+      console.log(`🎤 DEBUG: Generating voice response for user: ${userId}, message: "${message}"`);
+      
+      // Get the workspace user ID
+      const guildLink = await storage.getGuildLink(guildId);
+      const workspaceUserId = guildLink?.workspaceId || userId;
+      
+      if (!workspaceUserId) {
+        console.log(`🎤 DEBUG: No workspace user ID found for guild: ${guildId}`);
+        return;
+      }
+
+      // Use the existing banter generation system
+      if (this.discordService && this.discordService.banterCallback) {
+        console.log(`🎤 DEBUG: Calling banter callback for voice message`);
+        
+        const eventData = {
+          username: userId,
+          message: message,
+          source: 'voice',
+          isWakeWord: message.toLowerCase().includes('hey banter'),
+        };
+
+        await this.discordService.banterCallback(
+          workspaceUserId,
+          message,
+          'voice_message',
+          eventData
+        );
+        
+        console.log(`🎤 DEBUG: Voice response generated successfully`);
+      } else {
+        console.log(`🎤 DEBUG: No banter callback available for voice response`);
+      }
+    } catch (error) {
+      console.error('❌ Error generating voice response:', error);
     }
   }
 
