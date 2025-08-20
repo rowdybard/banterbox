@@ -39,7 +39,9 @@ app.use((req, res, next) => {
 (async () => {
   let server;
   try {
+    console.log('🚀 Starting server...');
     server = await registerRoutes(app);
+    console.log('✅ Routes registered successfully');
   } catch (error) {
     console.warn('⚠️  Discord service failed to start (likely missing tokens):', error instanceof Error ? error.message : 'Unknown error');
     console.log('📝 Server continuing without Discord functionality...');
@@ -50,14 +52,17 @@ app.use((req, res, next) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
     server = createServer(app);
+    console.log('✅ Minimal server created successfully');
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    console.error('❌ Server error:', err);
     res.status(status).json({ message });
-    throw err;
+    // Don't throw the error to prevent server crashes
+    // throw err;
   });
 
   // importantly only setup vite in development and after
@@ -79,6 +84,23 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`✅ Server running on port ${port}`);
+  });
+  
+  // Add graceful shutdown handling
+  process.on('SIGTERM', () => {
+    console.log('🛑 Received SIGTERM, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('🛑 Received SIGINT, shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
   });
 })();

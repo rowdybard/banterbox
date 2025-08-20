@@ -42,6 +42,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Discord bot interactions
   app.use('/api/discord', discordInteractions);
   
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      discord: globalDiscordService ? 'connected' : 'not_configured',
+      websocket: 'available'
+    });
+  });
+  
   const httpServer = createServer(app);
   
   // Initialize object storage service
@@ -2363,21 +2373,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Initialize global Discord service for bot operations
   if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_ID) {
-    globalDiscordService = new DiscordService({
-      token: process.env.DISCORD_BOT_TOKEN,
-      clientId: process.env.DISCORD_CLIENT_ID,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
-    });
-    
-    globalDiscordService.setBanterCallback(generateBanterFromDiscordEvent);
-    await globalDiscordService.connect();
-    console.log('Global Discord service initialized for voice channel operations');
-    
-    // Set the service in slash command handler
-    const { setDiscordService } = await import('./discord/slash');
-    setDiscordService(globalDiscordService);
-    
-    console.log('Global Discord service initialized for voice channel operations');
+    try {
+      console.log('Initializing Discord service...');
+      console.log('Discord environment check:', {
+        hasToken: !!process.env.DISCORD_BOT_TOKEN,
+        hasClientId: !!process.env.DISCORD_CLIENT_ID,
+        hasClientSecret: !!process.env.DISCORD_CLIENT_SECRET,
+        tokenLength: process.env.DISCORD_BOT_TOKEN?.length || 0
+      });
+      
+      globalDiscordService = new DiscordService({
+        token: process.env.DISCORD_BOT_TOKEN,
+        clientId: process.env.DISCORD_CLIENT_ID,
+        clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
+      });
+      
+      globalDiscordService.setBanterCallback(generateBanterFromDiscordEvent);
+      await globalDiscordService.connect();
+      console.log('✅ Global Discord service initialized successfully');
+      
+      // Set the service in slash command handler
+      const { setDiscordService } = await import('./discord/slash');
+      setDiscordService(globalDiscordService);
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize Discord service:', error);
+      console.log('📝 Server continuing without Discord functionality...');
+      globalDiscordService = null;
+    }
+  } else {
+    console.log('⚠️  Discord environment variables missing - skipping Discord initialization');
+    console.log('Required: DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID');
+    console.log('Optional: DISCORD_CLIENT_SECRET');
   }
 
   // Marketplace API routes
