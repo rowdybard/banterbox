@@ -1792,24 +1792,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test intelligent detection system
+  // Test intelligent detection system with OpenAI analysis
   app.post("/api/test-intelligent-detection", isAuthenticated, async (req, res) => {
     try {
       const { message } = req.body;
       const userId = (req.user as any)?.id;
       
-      console.log(`🧪 Testing intelligent detection: message="${message}" for user: ${userId}`);
+      console.log(`🧪 Testing intelligent detection with OpenAI: message="${message}" for user: ${userId}`);
       
+      const startTime = Date.now();
       const detectionResult = await IntelligentDetectionService.detectDirectQuestion({
         userId,
         currentMessage: message
       });
+      const endTime = Date.now();
       
       res.json({
         success: true,
         message,
         detectionResult,
-        explanation: detectionResult.reasoning
+        explanation: detectionResult.reasoning,
+        analysisTime: `${endTime - startTime}ms`,
+        features: {
+          usesOpenAI: true,
+          ruleBasedAnalysis: true,
+          confidenceScoring: true,
+          contextAware: true
+        }
       });
     } catch (error) {
       console.error('Intelligent detection test error:', error);

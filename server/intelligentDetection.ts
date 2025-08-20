@@ -1,6 +1,12 @@
 import { db } from "./db";
 import { aiResponses, contextMemory, type InsertAiResponse, type AiResponse } from "@shared/schema";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
+import OpenAI from "openai";
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export interface DetectionContext {
   userId: string;
@@ -54,7 +60,7 @@ export class IntelligentDetectionService {
       .limit(5);
 
     // Analyze the current message against recent context
-    const analysis = this.analyzeMessage(currentMessage, recentResponses, recentContext);
+    const analysis = await this.analyzeMessage(currentMessage, recentResponses, recentContext);
     
     return {
       isDirectQuestion: analysis.isDirectQuestion,
@@ -67,17 +73,18 @@ export class IntelligentDetectionService {
 
   /**
    * Analyzes a message against recent AI responses and conversation context
+   * Uses both rule-based analysis and OpenAI for intelligent understanding
    */
-  private static analyzeMessage(
+  private static async analyzeMessage(
     message: string, 
     recentResponses: AiResponse[], 
     recentContext: any[]
-  ): {
+  ): Promise<{
     isDirectQuestion: boolean;
     confidence: number;
     reasoning: string;
     relatedResponses: AiResponse[];
-  } {
+  }> {
     const lowerMessage = message.toLowerCase();
     
     // Direct question patterns that reference previous responses
@@ -157,6 +164,26 @@ export class IntelligentDetectionService {
     if (isQuestionFormat) {
       confidence += 1;
       reasoning += "Message is formatted as a question. ";
+    }
+    
+    // Use OpenAI for intelligent analysis
+    let openaiAnalysis = null;
+    try {
+      openaiAnalysis = await this.performOpenAIAnalysis(message, recentResponses, recentContext);
+      
+      // Combine OpenAI analysis with rule-based analysis
+      if (openaiAnalysis) {
+        if (openaiAnalysis.isDirectQuestion) {
+          confidence += 3; // OpenAI agrees it's a direct question
+          reasoning += `OpenAI analysis: ${openaiAnalysis.reasoning} `;
+        } else {
+          confidence -= 2; // OpenAI disagrees, reduce confidence
+          reasoning += `OpenAI analysis: ${openaiAnalysis.reasoning} `;
+        }
+      }
+    } catch (error) {
+      console.error('OpenAI analysis failed, using rule-based only:', error);
+      reasoning += "OpenAI analysis failed, using rule-based detection only. ";
     }
     
     // Determine if it's a direct question based on confidence
@@ -273,6 +300,132 @@ export class IntelligentDetectionService {
     }
     
     return false;
+  }
+
+  /**
+   * Performs OpenAI analysis to determine if a message is a direct question about previous responses
+   */
+  private static async performOpenAIAnalysis(
+    message: string,
+    recentResponses: AiResponse[],
+    recentContext: any[]
+  ): Promise<{
+    isDirectQuestion: boolean;
+    reasoning: string;
+    confidence: number;
+  } | null> {
+    try {
+      // Prepare context for OpenAI
+      const contextSummary = this.prepareContextForOpenAI(recentResponses, recentContext);
+      
+      const prompt = `You are an AI assistant that analyzes whether a user message is asking about previous AI responses or just making general conversation.
+
+CONTEXT - Recent AI Responses (last 2 hours):
+${contextSummary}
+
+CURRENT MESSAGE: "${message}"
+
+TASK: Determine if this message is a direct question about what the AI previously said or discussed.
+
+ANALYSIS CRITERIA:
+- Is the user asking about a specific response the AI gave?
+- Is the user referencing something the AI mentioned or discussed?
+- Is the user asking for clarification about previous AI statements?
+- Is the user asking "what did you just say?" or similar?
+- Is the user asking about the AI's opinion on something previously discussed?
+
+RESPONSE FORMAT:
+{
+  "isDirectQuestion": true/false,
+  "reasoning": "Detailed explanation of why this is or isn't a direct question",
+  "confidence": 1-10
+}
+
+Only respond with valid JSON.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini", // Use faster, cheaper model for analysis
+        messages: [
+          {
+            role: "system",
+            content: "You are a precise analyzer that determines if user messages are asking about previous AI responses. Respond only with valid JSON."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 300,
+        temperature: 0.1, // Low temperature for consistent analysis
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from OpenAI');
+      }
+
+      // Parse the JSON response
+      const analysis = JSON.parse(content);
+      
+      return {
+        isDirectQuestion: analysis.isDirectQuestion,
+        reasoning: analysis.reasoning,
+        confidence: analysis.confidence || 5
+      };
+
+    } catch (error) {
+      console.error('OpenAI analysis error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Prepares context summary for OpenAI analysis
+   */
+  private static prepareContextForOpenAI(recentResponses: AiResponse[], recentContext: any[]): string {
+    if (recentResponses.length === 0 && recentContext.length === 0) {
+      return "No recent conversation context available.";
+    }
+
+    let summary = "Recent AI Responses:\n";
+    
+    // Add recent AI responses
+    recentResponses.slice(0, 5).forEach((response, index) => {
+      const timeAgo = this.getTimeAgo(response.createdAt);
+      summary += `${index + 1}. [${timeAgo}] "${response.responseText}"\n`;
+      if (response.questionAsked) {
+        summary += `   (In response to: "${response.questionAsked}")\n`;
+      }
+    });
+
+    // Add recent context if available
+    if (recentContext.length > 0) {
+      summary += "\nRecent Conversation Context:\n";
+      recentContext.slice(0, 3).forEach((ctx, index) => {
+        const timeAgo = this.getTimeAgo(ctx.createdAt);
+        summary += `${index + 1}. [${timeAgo}] "${ctx.originalMessage || ctx.contextSummary}"\n`;
+      });
+    }
+
+    return summary;
+  }
+
+  /**
+   * Gets human-readable time ago string
+   */
+  private static getTimeAgo(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
   }
 
   /**
