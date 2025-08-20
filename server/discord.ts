@@ -520,7 +520,10 @@ export class DiscordService {
         
         audioStream.on('data', (chunk: Buffer) => {
           audioBuffer.push(chunk);
-          console.log(`🎤 Received audio chunk from user ${userId}, buffer size: ${audioBuffer.length}`);
+          // Only log every 10 chunks to reduce spam
+          if (audioBuffer.length % 10 === 0) {
+            console.log(`🎤 Audio buffer for user ${userId}: ${audioBuffer.length} chunks`);
+          }
         });
 
         audioStream.on('end', async () => {

@@ -101,25 +101,28 @@ export class VoiceService {
    */
   public async processAudio(audioData: Buffer, userId: string, guildId: string): Promise<void> {
     try {
-      console.log(`🎤 DEBUG: Processing audio from user ${userId}, data size: ${audioData.length} bytes`);
-      
       // Add to buffer
       this.audioBuffer.push(audioData);
-      console.log(`🎤 DEBUG: Audio buffer size now: ${this.audioBuffer.length}`);
+      
+      // Only log buffer size occasionally to reduce spam
+      if (this.audioBuffer.length % 50 === 0) {
+        console.log(`🎤 DEBUG: Audio buffer size: ${this.audioBuffer.length} chunks`);
+      }
 
       // Check if we have enough audio for processing (e.g., 3 seconds)
-      if (this.audioBuffer.length >= 30) { // Assuming 10 chunks per second
+      // Increased threshold to reduce processing frequency
+      if (this.audioBuffer.length >= 100) { // Increased from 30 to 100
         console.log(`🎤 DEBUG: Processing audio chunk, total chunks: ${this.audioBuffer.length}`);
         
         const audioChunk = Buffer.concat(this.audioBuffer);
-        this.audioBuffer = [];
+        this.audioBuffer = []; // Clear buffer immediately to prevent memory leak
         console.log(`🎤 DEBUG: Combined audio size: ${audioChunk.length} bytes`);
 
         // Transcribe the audio chunk
         console.log(`🎤 DEBUG: Starting transcription...`);
         const transcription = await this.transcribeAudio(audioChunk);
         
-        if (transcription) {
+        if (transcription && transcription.trim()) {
           console.log(`🎤 Voice transcription: "${transcription}"`);
           
           // Check for wake word
@@ -162,11 +165,10 @@ export class VoiceService {
             await this.storeVoiceContext(transcription, userId, guildId, false);
           }
         } else {
-          console.log(`🎤 DEBUG: Transcription failed or returned null`);
+          console.log(`🎤 DEBUG: Transcription failed or returned empty`);
         }
-      } else {
-        console.log(`🎤 DEBUG: Not enough audio yet (${this.audioBuffer.length}/30 chunks)`);
       }
+      // Removed the "not enough audio" log to reduce spam
     } catch (error) {
       console.error('❌ Error processing audio:', error);
     }
