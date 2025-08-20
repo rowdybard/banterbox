@@ -23,6 +23,7 @@ import TwitchEventSubClient from "./twitch";
 import { DiscordService } from "./discord";
 import OpenAI from "openai";
 import { elevenLabsService } from "./elevenlabs";
+import { isDirectQuestion } from "./utils";
 
 
 const openai = new OpenAI({ 
@@ -2438,13 +2439,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getTwitchSettings(userId);
       
       if (!settings) {
-        return res.status(404).json({ message: "Twitch settings not found" });
+        return res.json({ isConnected: false });
       }
       
       // Don't expose tokens in response
       const { accessToken, refreshToken, ...safeSettings } = settings;
       res.json(safeSettings);
     } catch (error) {
+      console.error('Error getting Twitch settings:', error);
       res.status(500).json({ message: "Failed to get Twitch settings" });
     }
   });
@@ -4440,10 +4442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-/**
- * Detects if a message is a direct question about recent events or what BanterBox said
- */
-import { isDirectQuestion } from './utils.js';
+
 
 /**
  * Applies response frequency filtering based on user settings with intelligent detection
