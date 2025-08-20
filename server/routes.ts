@@ -233,6 +233,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (contextString) {
           console.log(`Context length: ${contextString.length} characters`);
         }
+        
+        // For direct questions, also include the current message in context if it's not already there
+        if (isDirectQuestionResult && originalMessage) {
+          const currentMessageContext = `Current message: "${originalMessage}"`;
+          if (!contextString.includes(originalMessage)) {
+            contextString = `${currentMessageContext}\n\n${contextString}`;
+            console.log(`Added current message to context for direct question`);
+          }
+        }
       }
 
       let prompt = "";
@@ -255,13 +264,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`DEBUG: Detected direct question: "${originalMessage}" - will provide factual answer`);
         // For direct questions, prioritize factual answers over personality
         const factualPrompt = buildFactualResponsePrompt(originalMessage || '', contextString, eventType, eventData);
+        console.log(`DEBUG: Factual prompt for direct question:`, factualPrompt.substring(0, 300) + '...');
         
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
             {
               role: "system",
-              content: "You are a helpful assistant that provides factual answers about recent events and conversations. When asked about what just happened or what was said, provide accurate information based on the context provided. Be direct and honest - if you don't have enough information, say so. Keep responses under 50 words and be conversational but factual."
+              content: "You are a helpful assistant that provides factual answers about recent events and conversations. When asked about what just happened or what was said, provide accurate information based on the context provided. Be direct and honest - if you don't have enough information, say so. If someone mentioned specific details (like car models, names, etc.), reference them exactly. Keep responses under 50 words and be conversational but factual."
             },
             {
               role: "user",
@@ -4561,7 +4571,7 @@ function buildFactualResponsePrompt(
     prompt += ` - "${eventData.messageContent}"`;
   }
   
-  prompt += `\n\nPlease provide a factual answer to the question based on the context and current event. If you don't have enough information, say so.`;
+  prompt += `\n\nPlease provide a factual answer to the question based on the context and current event. If you don't have enough information, say so. Be specific and accurate - if someone mentioned something specific (like a car model, name, etc.), reference it exactly.`;
   
   return prompt;
 }

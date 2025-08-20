@@ -32,43 +32,58 @@ export class IntelligentDetectionService {
   static async detectDirectQuestion(context: DetectionContext): Promise<DetectionResult> {
     const { userId, guildId, currentMessage } = context;
     
-    // Get recent AI responses (last 10 responses, within 2 hours)
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    const recentResponses = await db.select()
-      .from(aiResponses)
-      .where(
-        and(
-          eq(aiResponses.userId, userId),
-          guildId ? eq(aiResponses.guildId, guildId) : sql`${aiResponses.guildId} IS NULL`,
-          gte(aiResponses.createdAt, twoHoursAgo)
+    try {
+      // Get recent AI responses (last 10 responses, within 2 hours)
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const recentResponses = await db.select()
+        .from(aiResponses)
+        .where(
+          and(
+            eq(aiResponses.userId, userId),
+            guildId ? eq(aiResponses.guildId, guildId) : sql`${aiResponses.guildId} IS NULL`,
+            gte(aiResponses.createdAt, twoHoursAgo)
+          )
         )
-      )
-      .orderBy(desc(aiResponses.createdAt))
-      .limit(10);
+        .orderBy(desc(aiResponses.createdAt))
+        .limit(10);
 
-    // Get recent conversation context
-    const recentContext = await db.select()
-      .from(contextMemory)
-      .where(
-        and(
-          eq(contextMemory.userId, userId),
-          guildId ? eq(contextMemory.guildId, guildId) : sql`${contextMemory.guildId} IS NULL`,
-          gte(contextMemory.createdAt, twoHoursAgo)
+      // Get recent conversation context
+      const recentContext = await db.select()
+        .from(contextMemory)
+        .where(
+          and(
+            eq(contextMemory.userId, userId),
+            guildId ? eq(contextMemory.guildId, guildId) : sql`${contextMemory.guildId} IS NULL`,
+            gte(contextMemory.createdAt, twoHoursAgo)
+          )
         )
-      )
-      .orderBy(desc(contextMemory.createdAt))
-      .limit(5);
+        .orderBy(desc(contextMemory.createdAt))
+        .limit(5);
 
-    // Analyze the current message against recent context
-    const analysis = await this.analyzeMessage(currentMessage, recentResponses, recentContext);
-    
-    return {
-      isDirectQuestion: analysis.isDirectQuestion,
-      confidence: analysis.confidence,
-      reasoning: analysis.reasoning,
-      relatedResponses: analysis.relatedResponses,
-      shouldAlwaysRespond: analysis.isDirectQuestion || analysis.confidence > 7
-    };
+      // Analyze the current message against recent context
+      const analysis = await this.analyzeMessage(currentMessage, recentResponses, recentContext);
+      
+      return {
+        isDirectQuestion: analysis.isDirectQuestion,
+        confidence: analysis.confidence,
+        reasoning: analysis.reasoning,
+        relatedResponses: analysis.relatedResponses,
+        shouldAlwaysRespond: analysis.isDirectQuestion || analysis.confidence > 7
+      };
+    } catch (error) {
+      console.error('Database error in intelligent detection, falling back to rule-based:', error);
+      
+      // Fallback to rule-based detection only
+      const fallbackAnalysis = this.analyzeMessageRuleBased(currentMessage);
+      
+      return {
+        isDirectQuestion: fallbackAnalysis.isDirectQuestion,
+        confidence: fallbackAnalysis.confidence,
+        reasoning: fallbackAnalysis.reasoning + " (Fallback mode - database unavailable)",
+        relatedResponses: [],
+        shouldAlwaysRespond: fallbackAnalysis.isDirectQuestion
+      };
+    }
   }
 
   /**
@@ -429,6 +444,94 @@ Only respond with valid JSON.`;
   }
 
   /**
+   * Rule-based message analysis (fallback when database is unavailable)
+   */
+  private static analyzeMessageRuleBased(message: string): {
+    isDirectQuestion: boolean;
+    confidence: number;
+    reasoning: string;
+  } {
+    const lowerMessage = message.toLowerCase();
+    
+    // Direct question patterns that reference previous responses
+    const directQuestionPatterns = [
+      // Explicit references to what was said
+      /what (did|do) (you|banterbox) (just |recently |)say/i,
+      /what (did|do) (you|banterbox) (just |recently |)respond/i,
+      /what (did|do) (you|banterbox) (just |recently |)answer/i,
+      /what (did|do) (you|banterbox) (just |recently |)tell/i,
+      /what (did|do) (you|banterbox) (just |recently |)mention/i,
+      
+      // References to previous responses
+      /what was (your|that|the) (response|answer|reply)/i,
+      /what did (you|banterbox) (respond|answer|reply) (with|to)/i,
+      /what was (your|that|the) (last|previous) (response|answer|reply)/i,
+      
+      // References to specific topics discussed
+      /what (did|do) (you|banterbox) (just |recently |)talk about/i,
+      /what (did|do) (you|banterbox) (just |recently |)discuss/i,
+      /what (did|do) (you|banterbox) (just |recently |)mention/i,
+      /what (did|do) (you|banterbox) (just |recently |)bring up/i,
+      
+      // References to specific events or context
+      /what (did|do) (you|banterbox) (just |recently |)say about/i,
+      /what (did|do) (you|banterbox) (just |recently |)think about/i,
+      /what (did|do) (you|banterbox) (just |recently |)feel about/i,
+      
+      // General context questions
+      /what (just |recently |)happened/i,
+      /what was (that|this|it) about/i,
+      /what did (you|banterbox) mean (by that|when you said)/i,
+      /can you (repeat|explain|clarify) (that|what you said)/i,
+      
+      // Specific response references
+      /what was (your|that|the) (joke|comment|remark)/i,
+      /what did (you|banterbox) (joke|comment|remark) about/i,
+      /what was (your|that|the) (opinion|thought|view)/i,
+      /what did (you|banterbox) (think|feel|believe) about/i,
+    ];
+
+    // Check if message matches direct question patterns
+    const patternMatch = directQuestionPatterns.some(pattern => pattern.test(lowerMessage));
+    
+    // Calculate confidence based on multiple factors
+    let confidence = 0;
+    let reasoning = "";
+    
+    if (patternMatch) {
+      confidence += 4; // Base confidence for pattern match
+      reasoning += "Message matches direct question patterns. ";
+    }
+    
+    // Check for temporal indicators
+    const hasTemporalIndicators = /(just|recently|before|earlier|last|previous)/i.test(lowerMessage);
+    if (hasTemporalIndicators) {
+      confidence += 1;
+      reasoning += "Message contains temporal indicators suggesting reference to recent events. ";
+    }
+    
+    // Check for question format
+    const isQuestionFormat = /\?$/.test(message.trim());
+    if (isQuestionFormat) {
+      confidence += 1;
+      reasoning += "Message is formatted as a question. ";
+    }
+    
+    // Determine if it's a direct question based on confidence
+    const isDirectQuestion = confidence >= 5;
+    
+    if (!isDirectQuestion) {
+      reasoning += "Overall confidence too low to classify as direct question. ";
+    }
+    
+    return {
+      isDirectQuestion,
+      confidence: Math.min(confidence, 10),
+      reasoning: reasoning.trim()
+    };
+  }
+
+  /**
    * Records an AI response for future detection
    */
   static async recordResponse(data: InsertAiResponse): Promise<void> {
@@ -437,8 +540,10 @@ Only respond with valid JSON.`;
         ...data,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
       });
+      console.log(`Recorded AI response for intelligent detection: ${data.responseText.substring(0, 50)}...`);
     } catch (error) {
-      console.error('Error recording AI response:', error);
+      console.error('Error recording AI response (table may not exist yet):', error);
+      // Don't throw - this is expected when the table doesn't exist yet
     }
   }
 
