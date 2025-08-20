@@ -131,18 +131,18 @@ export class PostgresContextService {
       
       console.log(`Found ${combinedContext.length} total recent context items`);
       
-      // Get similar event context
-      const similarContext = processedContext
-        .filter(ctx => ctx.eventType === currentEventType)
-        .filter(ctx => {
-          if (guildId) {
-            return ctx.guildId === guildId || !ctx.guildId;
-          } else {
-            return !ctx.guildId;
-          }
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 2); // Reduced from 5 to 2 for less overwhelming context
+             // Get similar event context and AI responses
+       const similarContext = processedContext
+         .filter(ctx => ctx.eventType === currentEventType || ctx.eventType === 'ai_response')
+         .filter(ctx => {
+           if (guildId) {
+             return ctx.guildId === guildId || !ctx.guildId;
+           } else {
+             return !ctx.guildId;
+           }
+         })
+         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+         .slice(0, 3); // Increased to 3 to include AI responses
       
       console.log(`Found ${similarContext.length} similar context items`);
       
@@ -351,6 +351,8 @@ export class PostgresContextService {
         return `Donation from ${eventData.displayName || eventData.username}`;
       case 'raid':
         return `Raid from ${eventData.displayName || eventData.username}`;
+      case 'ai_response':
+        return `BanterBox responded: "${eventData.message || eventData.messageContent || 'AI response'}"`;
       default:
         return `Event: ${eventType}`;
     }
