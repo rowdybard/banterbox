@@ -175,6 +175,26 @@ export const contextMemory = pgTable("context_memory", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
+// AI Response Tracking - stores AI responses for intelligent direct vs conversational detection
+export const aiResponses = pgTable("ai_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  guildId: varchar("guild_id"), // For Discord context
+  contextMemoryId: varchar("context_memory_id").references(() => contextMemory.id), // Link to context memory
+  responseText: text("response_text").notNull(), // The actual AI response
+  responseType: varchar("response_type").notNull(), // 'factual', 'personality', 'contextual'
+  questionAsked: text("question_asked"), // The question that triggered this response
+  confidence: integer("confidence").default(5), // 1-10 scale for response confidence
+  wasDirectQuestion: boolean("was_direct_question").default(false), // Whether this was a direct question
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // Auto-cleanup after 24 hours
+}, (table) => [
+  index("idx_ai_responses_user").on(table.userId),
+  index("idx_ai_responses_guild").on(table.guildId),
+  index("idx_ai_responses_context").on(table.contextMemoryId),
+  index("idx_ai_responses_created").on(table.createdAt),
+]);
+
 // Marketplace Voices - public voice marketplace
 export const marketplaceVoices = pgTable("marketplace_voices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -367,6 +387,14 @@ export const insertContextMemorySchema = createInsertSchema(contextMemory).omit(
 
 export type InsertContextMemory = z.infer<typeof insertContextMemorySchema>;
 export type ContextMemory = typeof contextMemory.$inferSelect;
+
+export const insertAiResponseSchema = createInsertSchema(aiResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiResponse = z.infer<typeof insertAiResponseSchema>;
+export type AiResponse = typeof aiResponses.$inferSelect;
 
 // Marketplace schemas
 export const insertMarketplaceVoiceSchema = createInsertSchema(marketplaceVoices).omit({

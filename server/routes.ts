@@ -17,6 +17,7 @@ import { setupTwitchAuth } from "./twitchAuth";
 import { setupDiscordAuth } from "./discordAuth";
 import discordInteractions from "./discord/interactions";
 import { ContextService } from "./contextService";
+import { IntelligentDetectionService } from "./intelligentDetection";
 import { registerCommands, getBotInviteUrl } from "./discord/commands";
 import TwitchEventSubClient from "./twitch";
 import { DiscordService } from "./discord";
@@ -385,6 +386,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Record AI response for intelligent detection
+      if (contextualUserId) {
+        try {
+          const isDirectQuestionResult = originalMessage ? isDirectQuestion(originalMessage) : false;
+          await IntelligentDetectionService.recordResponse({
+            userId: contextualUserId,
+            guildId: guildId || undefined,
+            contextMemoryId: contextId || undefined,
+            responseText: banterResponse,
+            responseType: isDirectQuestionResult ? 'factual' : 'personality',
+            questionAsked: originalMessage || undefined,
+            wasDirectQuestion: isDirectQuestionResult,
+            confidence: isDirectQuestionResult ? 8 : 5
+          });
+          console.log(`Recorded AI response for intelligent detection: ${banterResponse.substring(0, 50)}...`);
+        } catch (error) {
+          console.error('Error recording AI response for intelligent detection:', error);
+          // Don't fail banter generation if recording fails
+        }
+      }
+      
       return banterResponse;
     } catch (error) {
       console.error('Error generating banter:', error);
@@ -410,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const responseFrequency = userSettings?.responseFrequency || 50; // Default to 50%
       
       // Apply response frequency filtering for Twitch events
-      const shouldRespond = applyResponseFrequencyFilter(responseFrequency, 'twitch_event', originalMessage);
+      const shouldRespond = await applyResponseFrequencyFilter(responseFrequency, 'twitch_event', originalMessage, userId);
       if (!shouldRespond) {
         console.log(`Skipping Twitch response due to frequency setting (${responseFrequency}%)`);
         return;
@@ -689,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const responseFrequency = userSettings?.responseFrequency || 50; // Default to 50%
       
       // Apply response frequency filtering
-      const shouldRespond = applyResponseFrequencyFilter(responseFrequency, eventData.responseReason, originalMessage);
+      const shouldRespond = await applyResponseFrequencyFilter(responseFrequency, eventData.responseReason, originalMessage, workspaceUserId, eventData.guildId);
       if (!shouldRespond) {
         console.log(`Skipping response due to frequency setting (${responseFrequency}%) for reason: ${eventData.responseReason}`);
         return;
@@ -1763,6 +1785,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Personality system test error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Test intelligent detection system
+  app.post("/api/test-intelligent-detection", isAuthenticated, async (req, res) => {
+    try {
+      const { message } = req.body;
+      const userId = (req.user as any)?.id;
+      
+      console.log(`🧪 Testing intelligent detection: message="${message}" for user: ${userId}`);
+      
+      const detectionResult = await IntelligentDetectionService.detectDirectQuestion({
+        userId,
+        currentMessage: message
+      });
+      
+      res.json({
+        success: true,
+        message,
+        detectionResult,
+        explanation: detectionResult.reasoning
+      });
+    } catch (error) {
+      console.error('Intelligent detection test error:', error);
       res.status(500).json({ 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -4419,18 +4469,44 @@ function isDirectQuestion(message: string): boolean {
 }
 
 /**
- * Applies response frequency filtering based on user settings
+ * Applies response frequency filtering based on user settings with intelligent detection
  */
-function applyResponseFrequencyFilter(responseFrequency: number, responseReason: string, originalMessage: string): boolean {
+async function applyResponseFrequencyFilter(
+  responseFrequency: number, 
+  responseReason: string, 
+  originalMessage: string,
+  userId?: string,
+  guildId?: string
+): Promise<boolean> {
   // Always respond to direct mentions regardless of frequency setting
   if (responseReason === 'direct mention') {
     return true;
   }
 
-  // Always respond to direct questions about recent events or what BanterBox said
-  // These need context and should always be answered regardless of frequency setting
-  if (originalMessage && isDirectQuestion(originalMessage)) {
-    console.log(`Response frequency check: ALLOWED - Direct question detected: "${originalMessage}" (frequency: ${responseFrequency}%)`);
+  // Use intelligent detection for direct questions if we have user context
+  if (originalMessage && userId) {
+    try {
+      const detectionResult = await IntelligentDetectionService.detectDirectQuestion({
+        userId,
+        guildId,
+        currentMessage: originalMessage
+      });
+
+      if (detectionResult.shouldAlwaysRespond) {
+        console.log(`Response frequency check: ALLOWED - Intelligent detection: "${originalMessage}" (confidence: ${detectionResult.confidence}, reasoning: ${detectionResult.reasoning})`);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error in intelligent detection, falling back to pattern matching:', error);
+      // Fall back to pattern matching if intelligent detection fails
+      if (isDirectQuestion(originalMessage)) {
+        console.log(`Response frequency check: ALLOWED - Pattern match fallback: "${originalMessage}" (frequency: ${responseFrequency}%)`);
+        return true;
+      }
+    }
+  } else if (originalMessage && isDirectQuestion(originalMessage)) {
+    // Fallback to pattern matching if no user context
+    console.log(`Response frequency check: ALLOWED - Pattern match: "${originalMessage}" (frequency: ${responseFrequency}%)`);
     return true;
   }
 
