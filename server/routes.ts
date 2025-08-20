@@ -123,11 +123,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const clientsToRemove: WebSocket[] = [];
     Array.from(clients).forEach(client => {
       try {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-          console.log('Message sent to client');
-        } else {
-          console.log('Client not ready, marking for removal');
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+        console.log('Message sent to client');
+      } else {
+        console.log('Client not ready, marking for removal');
           clientsToRemove.push(client);
         }
       } catch (error) {
@@ -587,17 +587,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (selectedVoiceId && Array.isArray(favoriteVoices) && favoriteVoices.length > 0) {
           // Find the selected voice in favorites by unique ID
-          const selectedVoice = favoriteVoices.find((voice: any) => 
-            voice.id === selectedVoiceId
-          );
+          console.log('🔍 Looking for voice ID:', selectedVoiceId, 'Type:', typeof selectedVoiceId);
+          console.log('🔍 Available voices:', favoriteVoices.map((v: any) => ({ 
+            id: v.id, 
+            name: v.name, 
+            idType: typeof v.id,
+            idMatch: v.id === selectedVoiceId
+          })));
+          
+          const selectedVoice = favoriteVoices.find((voice: any) => {
+            const match = voice.id === selectedVoiceId;
+            console.log(`🔍 Comparing ${voice.id} (${typeof voice.id}) === ${selectedVoiceId} (${typeof selectedVoiceId}) = ${match}`);
+            return match;
+          });
           
           console.log('Selected voice found:', selectedVoice);
-          console.log('Looking for voice ID:', selectedVoiceId);
-          console.log('Available voices:', favoriteVoices.map((v: any) => ({ id: v.id, name: v.name })));
           
           if (selectedVoice) {
             const voiceId = selectedVoice.baseVoiceId || selectedVoice.voiceId;
-            console.log('Using voice ID for generation:', voiceId);
+            console.log('✅ Using voice ID for generation:', voiceId);
             // Pass the custom settings to the voice generation
             return await elevenLabsService.generateSpeech(enhancedText, voiceId, selectedVoice.settings);
           } else {
@@ -605,6 +613,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log('❌ This suggests the voice ID in settings does not match any voice in favorites');
             console.log('❌ Settings voiceId:', selectedVoiceId);
             console.log('❌ Favorite voice IDs:', favoriteVoices.map((v: any) => v.id));
+            
+            // Fallback: Try to find by string comparison
+            console.log('🔄 Trying fallback string comparison...');
+            const fallbackVoice = favoriteVoices.find((voice: any) => 
+              String(voice.id) === String(selectedVoiceId)
+            );
+            
+            if (fallbackVoice) {
+              console.log('✅ Found voice using fallback comparison:', fallbackVoice.name);
+              const voiceId = fallbackVoice.baseVoiceId || fallbackVoice.voiceId;
+              console.log('✅ Using fallback voice ID for generation:', voiceId);
+              return await elevenLabsService.generateSpeech(enhancedText, voiceId, fallbackVoice.settings);
+            } else {
+              console.log('❌ Fallback comparison also failed');
+            }
           }
         }
         
@@ -2500,20 +2523,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tokenLength: process.env.DISCORD_BOT_TOKEN?.length || 0
       });
       
-      globalDiscordService = new DiscordService({
-        token: process.env.DISCORD_BOT_TOKEN,
-        clientId: process.env.DISCORD_CLIENT_ID,
-        clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
-      });
-      
-      globalDiscordService.setBanterCallback(generateBanterFromDiscordEvent);
-      await globalDiscordService.connect();
+    globalDiscordService = new DiscordService({
+      token: process.env.DISCORD_BOT_TOKEN,
+      clientId: process.env.DISCORD_CLIENT_ID,
+      clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
+    });
+    
+    globalDiscordService.setBanterCallback(generateBanterFromDiscordEvent);
+    await globalDiscordService.connect();
       console.log('✅ Global Discord service initialized successfully');
-      
-      // Set the service in slash command handler
-      const { setDiscordService } = await import('./discord/slash');
-      setDiscordService(globalDiscordService);
-      
+    
+    // Set the service in slash command handler
+    const { setDiscordService } = await import('./discord/slash');
+    setDiscordService(globalDiscordService);
+    
     } catch (error) {
       console.error('❌ Failed to initialize Discord service:', error);
       console.log('📝 Server continuing without Discord functionality...');
@@ -3213,26 +3236,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Combine database voices with sample voices for a better user experience
-      const sampleVoices = [
-        {
+        const sampleVoices = [
+          {
           id: "sample-1",
-          name: "Gaming Warrior",
-          description: "Perfect for gaming streams with energetic commentary",
-          category: "Gaming",
-          tags: ["gaming", "energetic", "warrior"],
-          voiceId: "21m00Tcm4TlvDq8ikWAM",
-          baseVoiceId: "21m00Tcm4TlvDq8ikWAM",
-          settings: {
-            stability: 60,
-            similarityBoost: 80,
-            style: 20,
-            useSpeakerBoost: true
-          },
-          sampleText: "Welcome to the stream! Let's dominate this game!",
-          downloads: 850,
-          upvotes: 67,
-          downvotes: 2,
-          createdAt: "2024-01-15T10:00:00Z",
+            name: "Gaming Warrior",
+            description: "Perfect for gaming streams with energetic commentary",
+            category: "Gaming",
+            tags: ["gaming", "energetic", "warrior"],
+            voiceId: "21m00Tcm4TlvDq8ikWAM",
+            baseVoiceId: "21m00Tcm4TlvDq8ikWAM",
+            settings: {
+              stability: 60,
+              similarityBoost: 80,
+              style: 20,
+              useSpeakerBoost: true
+            },
+            sampleText: "Welcome to the stream! Let's dominate this game!",
+            downloads: 850,
+            upvotes: 67,
+            downvotes: 2,
+            createdAt: "2024-01-15T10:00:00Z",
           authorId: "banterbox-team",
           authorName: "BanterBox Team",
           isActive: true,
@@ -3241,23 +3264,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         {
           id: "sample-2",
-          name: "Chill Vibes",
-          description: "Relaxed and laid-back voice for casual streams",
-          category: "Entertainment",
-          tags: ["chill", "relaxed", "casual"],
-          voiceId: "ErXwobaYiN019PkySvjV",
-          baseVoiceId: "ErXwobaYiN019PkySvjV",
-          settings: {
-            stability: 75,
-            similarityBoost: 70,
-            style: 10,
-            useSpeakerBoost: false
-          },
-          sampleText: "Hey everyone, thanks for hanging out with us today.",
-          downloads: 1200,
-          upvotes: 89,
-          downvotes: 5,
-          createdAt: "2024-01-10T14:30:00Z",
+            name: "Chill Vibes",
+            description: "Relaxed and laid-back voice for casual streams",
+            category: "Entertainment",
+            tags: ["chill", "relaxed", "casual"],
+            voiceId: "ErXwobaYiN019PkySvjV",
+            baseVoiceId: "ErXwobaYiN019PkySvjV",
+            settings: {
+              stability: 75,
+              similarityBoost: 70,
+              style: 10,
+              useSpeakerBoost: false
+            },
+            sampleText: "Hey everyone, thanks for hanging out with us today.",
+            downloads: 1200,
+            upvotes: 89,
+            downvotes: 5,
+            createdAt: "2024-01-10T14:30:00Z",
           authorId: "banterbox-team",
           authorName: "BanterBox Team",
           isActive: true,
@@ -3266,23 +3289,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         {
           id: "sample-3",
-          name: "Professional Narrator",
-          description: "Clear and professional voice for educational content",
-          category: "Education",
-          tags: ["professional", "clear", "educational"],
-          voiceId: "JBFqnCBsd6RMkjVDRZzb",
-          baseVoiceId: "JBFqnCBsd6RMkjVDRZzb",
-          settings: {
-            stability: 85,
-            similarityBoost: 90,
-            style: 5,
-            useSpeakerBoost: true
-          },
-          sampleText: "Today we'll be exploring the fascinating world of science.",
-          downloads: 650,
-          upvotes: 45,
-          downvotes: 1,
-          createdAt: "2024-01-20T09:15:00Z",
+            name: "Professional Narrator",
+            description: "Clear and professional voice for educational content",
+            category: "Education",
+            tags: ["professional", "clear", "educational"],
+            voiceId: "JBFqnCBsd6RMkjVDRZzb",
+            baseVoiceId: "JBFqnCBsd6RMkjVDRZzb",
+            settings: {
+              stability: 85,
+              similarityBoost: 90,
+              style: 5,
+              useSpeakerBoost: true
+            },
+            sampleText: "Today we'll be exploring the fascinating world of science.",
+            downloads: 650,
+            upvotes: 45,
+            downvotes: 1,
+            createdAt: "2024-01-20T09:15:00Z",
           authorId: "banterbox-team",
           authorName: "BanterBox Team",
           isActive: true,
