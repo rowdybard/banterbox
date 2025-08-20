@@ -1,4 +1,3 @@
-import { Client, GatewayIntentBits, VoiceChannel, VoiceConnection, joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import { OpenAI } from 'openai';
 import { ContextService } from './contextService';
 import { storage } from './storage';
@@ -17,8 +16,7 @@ export interface VoiceSettings {
 
 export class VoiceService {
   private static instance: VoiceService;
-  private client: Client;
-  private connections: Map<string, VoiceConnection> = new Map();
+  private discordService: any; // Reference to existing Discord service
   private isListening: boolean = false;
   private audioBuffer: Buffer[] = [];
   private lastTranscriptionTime: number = 0;
@@ -26,13 +24,7 @@ export class VoiceService {
   private transcriptionBuffer: string = '';
 
   private constructor() {
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessages,
-      ],
-    });
+    // Voice service will work with existing Discord service
   }
 
   public static getInstance(): VoiceService {
@@ -43,15 +35,10 @@ export class VoiceService {
   }
 
   /**
-   * Initialize the voice service
+   * Set reference to Discord service
    */
-  public async initialize(): Promise<void> {
-    try {
-      await this.client.login(process.env.DISCORD_BOT_TOKEN);
-      console.log('✅ Voice service initialized');
-    } catch (error) {
-      console.error('❌ Failed to initialize voice service:', error);
-    }
+  public setDiscordService(discordService: any): void {
+    this.discordService = discordService;
   }
 
   /**
@@ -59,32 +46,22 @@ export class VoiceService {
    */
   public async startListening(guildId: string, channelId: string, userId: string): Promise<boolean> {
     try {
-      const guild = this.client.guilds.cache.get(guildId);
-      if (!guild) {
-        console.error('Guild not found:', guildId);
+      if (!this.discordService) {
+        console.error('Discord service not available');
         return false;
       }
 
-      const channel = guild.channels.cache.get(channelId) as VoiceChannel;
-      if (!channel || channel.type !== 2) { // 2 = voice channel
-        console.error('Voice channel not found:', channelId);
+      // Use existing Discord service to join voice channel
+      const success = await this.discordService.joinVoiceChannel(guildId, channelId);
+      
+      if (success) {
+        this.isListening = true;
+        console.log(`🎤 Started listening to voice channel: ${channelId}`);
+        return true;
+      } else {
+        console.error('Failed to join voice channel');
         return false;
       }
-
-      // Join the voice channel
-      const connection = joinVoiceChannel({
-        channelId: channel.id,
-        guildId: channel.guild.id,
-        adapterCreator: channel.guild.voiceAdapterCreator,
-        selfDeaf: false,
-        selfMute: false,
-      });
-
-      this.connections.set(guildId, connection);
-      this.isListening = true;
-
-      console.log(`🎤 Started listening to voice channel: ${channel.name}`);
-      return true;
     } catch (error) {
       console.error('❌ Failed to start voice listening:', error);
       return false;
@@ -96,13 +73,15 @@ export class VoiceService {
    */
   public async stopListening(guildId: string): Promise<void> {
     try {
-      const connection = this.connections.get(guildId);
-      if (connection) {
-        connection.destroy();
-        this.connections.delete(guildId);
-        this.isListening = false;
-        console.log('🔇 Stopped voice listening');
+      if (!this.discordService) {
+        console.error('Discord service not available');
+        return;
       }
+
+      // Use existing Discord service to leave voice channel
+      await this.discordService.leaveVoiceChannel(guildId);
+      this.isListening = false;
+      console.log('🔇 Stopped voice listening');
     } catch (error) {
       console.error('❌ Failed to stop voice listening:', error);
     }

@@ -364,6 +364,8 @@ export class PostgresContextService {
         return `User ${eventData.displayName || eventData.username} joined the server`;
       case 'discord_reaction':
         return `User ${eventData.displayName || eventData.username} reacted with ${eventData.emoji}`;
+      case 'voice_message':
+        return `Voice message from ${eventData.displayName || eventData.username}: "${eventData.message}"`;
       case 'chat':
         return `Chat message from ${eventData.displayName || eventData.username}`;
       case 'subscription':

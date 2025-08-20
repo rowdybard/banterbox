@@ -460,7 +460,7 @@ export type InsertDiscordSettings = z.infer<typeof insertDiscordSettingsSchema>;
 export type DiscordSettings = typeof discordSettings.$inferSelect;
 
 // Event types
-export type EventType = 'chat' | 'subscription' | 'donation' | 'raid' | 'discord_message' | 'discord_member_join' | 'discord_reaction';
+export type EventType = 'chat' | 'subscription' | 'donation' | 'raid' | 'discord_message' | 'discord_member_join' | 'discord_reaction' | 'voice_message';
 
 export type EventData = {
   username?: string;

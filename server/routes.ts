@@ -2697,6 +2697,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { setDiscordService } = await import('./discord/slash');
     setDiscordService(globalDiscordService);
     
+    // Initialize voice service and connect it to Discord service
+    try {
+      const { VoiceService } = await import('./voiceService');
+      const voiceService = VoiceService.getInstance();
+      voiceService.setDiscordService(globalDiscordService);
+      console.log('✅ Voice service initialized and connected to Discord service');
+    } catch (error) {
+      console.error('❌ Failed to initialize voice service:', error);
+    }
+    
     } catch (error) {
       console.error('❌ Failed to initialize Discord service:', error);
       console.log('📝 Server continuing without Discord functionality...');
