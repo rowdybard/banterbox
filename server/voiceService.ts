@@ -46,20 +46,29 @@ export class VoiceService {
    */
   public async startListening(guildId: string, channelId: string, userId: string): Promise<boolean> {
     try {
+      console.log(`🎤 DEBUG: Starting voice listening for guild: ${guildId}, channel: ${channelId}, user: ${userId}`);
+      
       if (!this.discordService) {
-        console.error('Discord service not available');
+        console.error('❌ Discord service not available');
         return false;
       }
+
+      // Get current voice settings for debugging
+      const voiceSettings = await this.getVoiceSettings(userId);
+      console.log(`🎤 DEBUG: Current voice settings:`, JSON.stringify(voiceSettings, null, 2));
 
       // Use existing Discord service to join voice channel
       const success = await this.discordService.joinVoiceChannel(guildId, channelId);
       
       if (success) {
         this.isListening = true;
-        console.log(`🎤 Started listening to voice channel: ${channelId}`);
+        console.log(`✅ Started listening to voice channel: ${channelId}`);
+        console.log(`🎤 DEBUG: Voice listening status: ${this.isListening}`);
+        console.log(`🎤 DEBUG: Audio buffer size: ${this.audioBuffer.length}`);
+        console.log(`🎤 DEBUG: Wake word detected: ${this.wakeWordDetected}`);
         return true;
       } else {
-        console.error('Failed to join voice channel');
+        console.error('❌ Failed to join voice channel');
         return false;
       }
     } catch (error) {
@@ -250,7 +259,12 @@ export class VoiceService {
    */
   public async updateVoiceSettings(userId: string, settings: Partial<VoiceSettings>): Promise<void> {
     try {
+      console.log(`🎤 DEBUG: Updating voice settings for user: ${userId}`);
+      console.log(`🎤 DEBUG: New settings:`, JSON.stringify(settings, null, 2));
+      
       const userSettings = await storage.getUserSettings(userId);
+      console.log(`🎤 DEBUG: Current user settings:`, JSON.stringify(userSettings?.voiceSettings, null, 2));
+      
       const updatedSettings = {
         ...userSettings,
         voiceSettings: {
@@ -261,8 +275,62 @@ export class VoiceService {
 
       await storage.updateUserSettings(userId, updatedSettings);
       console.log(`✅ Updated voice settings for user: ${userId}`);
+      console.log(`🎤 DEBUG: Final voice settings:`, JSON.stringify(updatedSettings.voiceSettings, null, 2));
     } catch (error) {
       console.error('❌ Failed to update voice settings:', error);
+    }
+  }
+
+  /**
+   * Check if a user is whitelisted for voice listening
+   */
+  public async isUserWhitelisted(userId: string, guildId: string): Promise<boolean> {
+    try {
+      const voiceSettings = await this.getVoiceSettings(userId);
+      console.log(`🎤 DEBUG: Checking whitelist for user: ${userId}`);
+      console.log(`🎤 DEBUG: Voice settings:`, JSON.stringify(voiceSettings, null, 2));
+      
+      if (!voiceSettings) {
+        console.log(`🎤 DEBUG: No voice settings found for user: ${userId}`);
+        return false;
+      }
+
+      const isWhitelisted = voiceSettings.whitelistedUsers.includes(userId);
+      console.log(`🎤 DEBUG: User ${userId} whitelisted: ${isWhitelisted}`);
+      console.log(`🎤 DEBUG: Whitelisted users:`, voiceSettings.whitelistedUsers);
+      
+      return isWhitelisted;
+    } catch (error) {
+      console.error('❌ Error checking whitelist:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get recent voice transcriptions for debugging
+   */
+  public async getRecentVoiceActivity(userId: string, guildId: string, limit: number = 10): Promise<any[]> {
+    try {
+      console.log(`🎤 DEBUG: Getting recent voice activity for user: ${userId}, guild: ${guildId}`);
+      
+      // Get the workspace user ID
+      const guildLink = await storage.getGuildLink(guildId);
+      const workspaceUserId = guildLink?.workspaceId || userId;
+      
+      if (!workspaceUserId) {
+        console.log(`🎤 DEBUG: No workspace user ID found for guild: ${guildId}`);
+        return [];
+      }
+
+      // This would query the context system for recent voice messages
+      // For now, just return debug info
+      console.log(`🎤 DEBUG: Would query context for workspace user: ${workspaceUserId}`);
+      console.log(`🎤 DEBUG: Looking for 'voice_message' events`);
+      
+      return [];
+    } catch (error) {
+      console.error('❌ Error getting recent voice activity:', error);
+      return [];
     }
   }
 }

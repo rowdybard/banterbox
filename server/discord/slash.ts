@@ -142,8 +142,9 @@ export async function handleCommand(body: any) {
       case 'favorites':
         return await handleFavoritesCommand(body, guildId, userId);
       
-      case 'voice':
-        return await handleVoiceCommand(body, guildId, userId);
+          case 'voice':
+      console.log(`🎤 DEBUG: Voice command received - action: ${body.data.options?.find((o: any) => o.name === 'action')?.value}`);
+      return await handleVoiceCommand(body, guildId, userId);
       
       default:
         return ephemeral('❌ Unknown command.');
@@ -676,31 +677,46 @@ async function handleVoiceCommand(body: any, guildId: string, userId: string) {
         return ephemeral(`🎤 **Voice Listening Status: ${status}**\n\n👤 **Streamer:** <@${settings.streamerId}>\n👥 **Whitelisted Users:** ${whitelistText}\n📺 **Channel:** <#${settings.voiceChannelId}>\n\n💡 **Wake Word:** "hey banter"`);
 
       case 'whitelist':
+        console.log(`🎤 DEBUG: Whitelist command called by user: ${userId}`);
+        console.log(`🎤 DEBUG: Target user: ${targetUser}`);
+        console.log(`🎤 DEBUG: Workspace user ID: ${workspaceUserId}`);
+        
         if (!targetUser) {
+          console.log(`🎤 DEBUG: No target user specified`);
           return ephemeral('❌ Please specify a user to add/remove from whitelist: `/voice whitelist @user`');
         }
 
         const currentSettings = await voiceService.getVoiceSettings(workspaceUserId);
+        console.log(`🎤 DEBUG: Current voice settings:`, JSON.stringify(currentSettings, null, 2));
+        
         if (!currentSettings) {
+          console.log(`🎤 DEBUG: No voice settings found`);
           return ephemeral('❌ Voice listening must be started first. Use `/voice start`.');
         }
 
         const currentWhitelist = currentSettings.whitelistedUsers || [];
         const isWhitelisted = currentWhitelist.includes(targetUser);
+        
+        console.log(`🎤 DEBUG: Current whitelist:`, currentWhitelist);
+        console.log(`🎤 DEBUG: Is user whitelisted: ${isWhitelisted}`);
 
         if (isWhitelisted) {
           // Remove from whitelist
+          console.log(`🎤 DEBUG: Removing user from whitelist`);
           const newWhitelist = currentWhitelist.filter(id => id !== targetUser);
           await voiceService.updateVoiceSettings(workspaceUserId, {
             whitelistedUsers: newWhitelist
           });
+          console.log(`🎤 DEBUG: User removed from whitelist`);
           return ephemeral(`✅ Removed <@${targetUser}> from voice whitelist.`);
         } else {
           // Add to whitelist
+          console.log(`🎤 DEBUG: Adding user to whitelist`);
           const newWhitelist = [...currentWhitelist, targetUser];
           await voiceService.updateVoiceSettings(workspaceUserId, {
             whitelistedUsers: newWhitelist
           });
+          console.log(`🎤 DEBUG: User added to whitelist`);
           return ephemeral(`✅ Added <@${targetUser}> to voice whitelist.`);
         }
 
