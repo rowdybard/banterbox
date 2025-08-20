@@ -64,14 +64,16 @@ export function useWebSocket(onMessage?: (data: any) => void) {
         console.log("WebSocket disconnected:", event.code, event.reason);
         setIsConnected(false);
         
+        // TEMPORARILY DISABLE AUTO-RECONNECT TO DEBUG
+        console.log("AUTO-RECONNECT DISABLED FOR DEBUGGING");
         // Only reconnect if it wasn't a deliberate close
-        if (event.code !== 1000 && event.code !== 1001) {
-          // Attempt to reconnect after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log("Attempting to reconnect WebSocket...");
-            connect();
-          }, 3000);
-        }
+        // if (event.code !== 1000 && event.code !== 1001) {
+        //   // Attempt to reconnect after 3 seconds
+        //   reconnectTimeoutRef.current = setTimeout(() => {
+        //     console.log("Attempting to reconnect WebSocket...");
+        //     connect();
+        //   }, 3000);
+        // }
       };
       
       wsRef.current.onerror = (error) => {
@@ -80,11 +82,13 @@ export function useWebSocket(onMessage?: (data: any) => void) {
       };
     } catch (error) {
       console.error("Failed to create WebSocket connection:", error);
+      // TEMPORARILY DISABLE AUTO-RECONNECT TO DEBUG
+      console.log("CONNECTION ERROR - AUTO-RECONNECT DISABLED FOR DEBUGGING");
       // Attempt to reconnect after 5 seconds on connection error
-      reconnectTimeoutRef.current = setTimeout(() => {
-        console.log("Retrying WebSocket connection...");
-        connect();
-      }, 5000);
+      // reconnectTimeoutRef.current = setTimeout(() => {
+      //   console.log("Retrying WebSocket connection...");
+      //   connect();
+      // }, 5000);
     }
   }, []); // Empty dependency array to prevent recreation
 
