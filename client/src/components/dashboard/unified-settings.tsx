@@ -255,15 +255,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setVoiceId('');
     } else if (provider === 'elevenlabs' && !voiceId) {
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
-    } else if (provider === 'favorite' && (favoriteVoices as any)?.voices?.length > 0) {
-      const currentVoiceIsFavorite = (favoriteVoices as any).voices.some((voice: any) =>
-        voice.id === voiceId
-      );
-      
-      if (!currentVoiceIsFavorite) {
-        setVoiceId((favoriteVoices as any).voices[0].id);
-      }
-    }
+
   };
 
   const handleVoiceIdChange = (id: string) => {
@@ -306,7 +298,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
   // Test current voice
   const handleTestVoice = () => {
-    if ((voiceProvider === 'elevenlabs' || voiceProvider === 'favorite') && voiceId) {
+    if (voiceProvider === 'elevenlabs' && voiceId) {
       testVoiceMutation.mutate({ voiceId });
     } else {
       toast({
@@ -434,9 +426,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                 <SelectItem value="custom" disabled={!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise')}>
                   Custom Voice Clone {!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && '(Pro Required)'}
                 </SelectItem>
-                <SelectItem value="favorite" disabled={!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') || !(favoriteVoices as any)?.voices?.length}>
-                  Saved Voices {!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && '(Pro Required)'} {(!(favoriteVoices as any)?.voices?.length) && '(No saved voices)'}
-                </SelectItem>
+
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-400 mt-1">
@@ -472,14 +462,16 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                       <div className="px-2 py-1.5 text-xs font-medium text-gray-400 border-b border-gray-600 mt-2">
                         Saved Voices
                       </div>
-                      {(favoriteVoices as any).voices.map((voice: any) => (
-                        <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
-                          <div className="flex items-center space-x-2">
-                            <Star className="h-3 w-3 text-yellow-400" />
-                            <span>{voice.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      <div className="max-h-32 overflow-y-auto">
+                        {(favoriteVoices as any).voices.map((voice: any) => (
+                          <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
+                            <div className="flex items-center space-x-2">
+                              <Star className="h-3 w-3 text-yellow-400" />
+                              <span>{voice.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </div>
                     </>
                   )}
                 </SelectContent>
@@ -487,48 +479,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
             </div>
           )}
 
-          {/* Favorite Voice Selection */}
-          {voiceProvider === 'favorite' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (
-            <div>
-              <Label className="text-sm font-medium text-gray-300 mb-2 block">
-                Saved Voice
-              </Label>
-              {(favoriteVoices as any)?.voices?.length > 0 ? (
-                <Select 
-                  value={voiceId || ""}
-                  onValueChange={handleVoiceIdChange}
-                  data-testid="select-favorite-voice"
-                >
-                  <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Select a saved voice..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {(favoriteVoices as any).voices.map((voice: any) => {
-                      const voiceValue = voice.id; // Use the unique voice ID instead of baseVoiceId
-                      console.log('Rendering voice option:', { 
-                        voiceId: voice.id, 
-                        voiceValue, 
-                        name: voice.name,
-                        isSelected: voiceValue === voiceId 
-                      });
-                      return (
-                        <SelectItem key={voice.id} value={voiceValue}>
-                          <div className="flex items-center space-x-2">
-                            <Star className="h-3 w-3 text-yellow-400" />
-                            <span>{voice.name}</span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="text-sm text-gray-400 p-3 bg-gray-800 rounded border border-gray-700">
-                  No saved voices found. Create custom voices in the Voice Builder to see them here.
-                </div>
-              )}
-            </div>
-          )}
+
 
           {/* Volume Control */}
           <div>
@@ -580,7 +531,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
               {updateSettingsMutation.isPending ? "Saving..." : "Save Voice Settings"}
             </Button>
             
-            {(voiceProvider === 'elevenlabs' || voiceProvider === 'favorite') && voiceId && (
+            {voiceProvider === 'elevenlabs' && voiceId && (
               <Button
                 onClick={handleTestVoice}
                 disabled={testVoiceMutation.isPending}
