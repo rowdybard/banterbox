@@ -99,6 +99,13 @@ export const userSettings = pgTable("user_settings", {
   customPersonalityPrompt: text("custom_personality_prompt"),
   favoritePersonalities: jsonb("favorite_personalities").default([]), // Array of saved personality objects
   favoriteVoices: jsonb("favorite_voices").default([]), // Array of saved voice objects
+  voiceSettings: jsonb("voice_settings").default({
+    enabled: false,
+    streamerId: null,
+    whitelistedUsers: [],
+    voiceChannelId: null,
+    guildId: null
+  }), // Voice listening settings
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

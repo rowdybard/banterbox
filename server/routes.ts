@@ -231,8 +231,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contextString = "";
       
       if (contextualUserId) {
-        contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
-        console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
+        // For direct questions, prioritize voice context
+        if (isDirectQuestionResult) {
+          contextString = await ContextService.getContextForDirectQuestions(contextualUserId, eventType, guildId);
+          console.log(`Voice-prioritized context retrieved for direct question:`, contextString ? 'Has context' : 'No context');
+        } else {
+          contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
+          console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
+        }
+        
         if (contextString) {
           console.log(`Context length: ${contextString.length} characters`);
         }

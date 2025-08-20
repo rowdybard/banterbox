@@ -71,6 +71,29 @@ export class PostgresContextService {
     currentEventType: EventType,
     guildId?: string
   ): Promise<string> {
+    return this.getContextForBanterInternal(userId, currentEventType, guildId, false);
+  }
+
+  /**
+   * Gets context prioritizing voice context for direct questions
+   */
+  static async getContextForDirectQuestions(
+    userId: string,
+    currentEventType: EventType,
+    guildId?: string
+  ): Promise<string> {
+    return this.getContextForBanterInternal(userId, currentEventType, guildId, true);
+  }
+
+  /**
+   * Internal method for getting context with voice priority option
+   */
+  private static async getContextForBanterInternal(
+    userId: string,
+    currentEventType: EventType,
+    guildId?: string,
+    prioritizeVoice: boolean = false
+  ): Promise<string> {
     try {
       console.log(`Getting context for user ${userId}, event type ${currentEventType}, guild ${guildId}`);
       
@@ -87,8 +110,26 @@ export class PostgresContextService {
         .orderBy(desc(contextMemory.createdAt))
         .limit(50);
 
+      // If prioritizing voice context, filter and sort voice context first
+      let processedContext = recentContext;
+      if (prioritizeVoice) {
+        const voiceContext = recentContext.filter(ctx => 
+          ctx.eventType === 'voice_message' || 
+          (ctx.eventData && typeof ctx.eventData === 'object' && 'source' in ctx.eventData && ctx.eventData.source === 'voice')
+        );
+        
+        const textContext = recentContext.filter(ctx => 
+          ctx.eventType !== 'voice_message' && 
+          (!ctx.eventData || typeof ctx.eventData !== 'object' || !('source' in ctx.eventData) || ctx.eventData.source !== 'voice')
+        );
+
+        // Prioritize voice context by putting it first
+        processedContext = [...voiceContext, ...textContext];
+        console.log(`Prioritized context: ${voiceContext.length} voice items, ${textContext.length} text items`);
+      }
+
       // Revolutionary Smart Context Logic - Only use context when it makes sense
-      const shouldUseContext = this.shouldUseContextForEvent(currentEventType, recentContext.length);
+      const shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
       
       if (!shouldUseContext) {
         console.log('Smart context logic: Skipping context for this event type');
@@ -97,12 +138,12 @@ export class PostgresContextService {
       
       // Filter by guildId if specified
       const guildContext = guildId 
-        ? recentContext.filter(ctx => ctx.guildId === guildId)
-        : recentContext.filter(ctx => !ctx.guildId);
+        ? processedContext.filter(ctx => ctx.guildId === guildId)
+        : processedContext.filter(ctx => !ctx.guildId);
       
       // Get global context (no guildId) if we have guildId specified
       const globalContext = guildId 
-        ? recentContext.filter(ctx => !ctx.guildId)
+        ? processedContext.filter(ctx => !ctx.guildId)
         : [];
       
       // Combine and sort by creation date - limit to prevent overwhelming
@@ -113,7 +154,7 @@ export class PostgresContextService {
       console.log(`Found ${combinedContext.length} total recent context items`);
       
       // Get similar event context
-      const similarContext = recentContext
+      const similarContext = processedContext
         .filter(ctx => ctx.eventType === currentEventType)
         .filter(ctx => {
           if (guildId) {

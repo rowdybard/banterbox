@@ -35,7 +35,8 @@ const commands = [
         required: true,
         choices: [
           { name: 'personality', value: 'personality' },
-          { name: 'voice', value: 'voice' }
+          { name: 'voice', value: 'voice' },
+          { name: 'voice-listening', value: 'voice-listening' }
         ]
       },
       {
@@ -50,7 +51,9 @@ const commands = [
           { name: 'hype', value: 'hype' },
           { name: 'chill', value: 'chill' },
           { name: 'custom', value: 'custom' },
-          { name: 'default', value: 'default' }
+          { name: 'default', value: 'default' },
+          { name: 'on', value: 'on' },
+          { name: 'off', value: 'off' }
         ]
       }
     ]
@@ -71,6 +74,30 @@ const commands = [
   {
     name: 'leave',
     description: 'Leave voice channel and stop streaming mode'
+  },
+  {
+    name: 'voice',
+    description: 'Manage voice listening settings',
+    options: [
+      {
+        name: 'action',
+        description: 'Action to perform',
+        type: 3, // STRING
+        required: true,
+        choices: [
+          { name: 'start', value: 'start' },
+          { name: 'stop', value: 'stop' },
+          { name: 'status', value: 'status' },
+          { name: 'whitelist', value: 'whitelist' }
+        ]
+      },
+      {
+        name: 'user',
+        description: 'User to add/remove from whitelist (for whitelist action)',
+        type: 6, // USER
+        required: false
+      }
+    ]
   },
   {
     name: 'favorites',

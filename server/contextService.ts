@@ -33,6 +33,17 @@ export class ContextService {
   }
 
   /**
+   * Gets context prioritizing voice context for direct questions
+   */
+  static async getContextForDirectQuestions(
+    userId: string,
+    currentEventType: EventType,
+    guildId?: string
+  ): Promise<string> {
+    return PostgresContextService.getContextForDirectQuestions(userId, currentEventType, guildId);
+  }
+
+  /**
    * Records a successful banter interaction to improve future context
    */
   static async recordBanterSuccess(

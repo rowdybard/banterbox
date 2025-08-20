@@ -142,6 +142,9 @@ export async function handleCommand(body: any) {
       case 'favorites':
         return await handleFavoritesCommand(body, guildId, userId);
       
+      case 'voice':
+        return await handleVoiceCommand(body, guildId, userId);
+      
       default:
         return ephemeral('❌ Unknown command.');
     }
@@ -576,5 +579,121 @@ async function handleLeaveCommand(guildId: string, userId: string) {
   } catch (error) {
     console.error('Error leaving voice channel:', error);
     return ephemeral('❌ An error occurred while leaving the voice channel.');
+  }
+}
+
+/**
+ * Handles /voice command
+ */
+async function handleVoiceCommand(body: any, guildId: string, userId: string) {
+  try {
+    const guildLink = await storage.getGuildLink(guildId);
+    if (!guildLink || !guildLink.active) {
+      return ephemeral('❌ This server must be linked to BanterBox before using voice features. Use `/link <code>` first.');
+    }
+
+    const action = body.data.options?.find((o: any) => o.name === 'action')?.value;
+    const targetUser = body.data.options?.find((o: any) => o.name === 'user')?.value;
+
+    if (!action) {
+      return ephemeral('❌ Please specify an action: start, stop, status, or whitelist.');
+    }
+
+    const workspaceUserId = guildLink.workspaceId;
+    const VoiceService = (await import('../voiceService')).VoiceService;
+    const voiceService = VoiceService.getInstance();
+
+    switch (action) {
+      case 'start':
+        // Check if user has permission
+        const permission = await checkStreamingPermission(body, guildId, userId);
+        if (!permission.allowed) {
+          return ephemeral(`❌ **Permission Denied**\n\n${permission.reason}`);
+        }
+
+        // Get user's current voice channel
+        const member = body.member;
+        const voiceState = member?.voice_state;
+        const channelId = voiceState?.channel_id;
+
+        if (!channelId) {
+          return ephemeral('❌ You must be in a voice channel to start voice listening.');
+        }
+
+        // Update voice settings
+        await voiceService.updateVoiceSettings(workspaceUserId, {
+          enabled: true,
+          streamerId: userId,
+          voiceChannelId: channelId,
+          guildId: guildId,
+          whitelistedUsers: [userId] // Start with just the streamer
+        });
+
+        // Start listening
+        const success = await voiceService.startListening(guildId, channelId, userId);
+        
+        if (success) {
+          return ephemeral('✅ **Voice Listening Started!**\n\n🎤 I\'m now listening to your voice channel for "hey banter" wake word.\n💬 All voice conversation will be stored as context.\n👥 Use `/voice whitelist @user` to add friends.\n🛑 Use `/voice stop` to stop listening.');
+        } else {
+          return ephemeral('❌ Failed to start voice listening. Please check permissions and try again.');
+        }
+
+      case 'stop':
+        await voiceService.stopListening(guildId);
+        await voiceService.updateVoiceSettings(workspaceUserId, {
+          enabled: false
+        });
+        return ephemeral('🔇 **Voice Listening Stopped!**\n\nNo longer listening to voice channels.');
+
+      case 'status':
+        const settings = await voiceService.getVoiceSettings(workspaceUserId);
+        const isListening = voiceService.isVoiceListening();
+        
+        if (!settings?.enabled) {
+          return ephemeral('🔇 **Voice Listening Status: DISABLED**\n\nUse `/voice start` to begin listening.');
+        }
+
+        const status = isListening ? '🟢 ACTIVE' : '🔴 INACTIVE';
+        const whitelistText = settings.whitelistedUsers.length > 0 
+          ? settings.whitelistedUsers.map(id => `<@${id}>`).join(', ')
+          : 'None';
+
+        return ephemeral(`🎤 **Voice Listening Status: ${status}**\n\n👤 **Streamer:** <@${settings.streamerId}>\n👥 **Whitelisted Users:** ${whitelistText}\n📺 **Channel:** <#${settings.voiceChannelId}>\n\n💡 **Wake Word:** "hey banter"`);
+
+      case 'whitelist':
+        if (!targetUser) {
+          return ephemeral('❌ Please specify a user to add/remove from whitelist: `/voice whitelist @user`');
+        }
+
+        const currentSettings = await voiceService.getVoiceSettings(workspaceUserId);
+        if (!currentSettings) {
+          return ephemeral('❌ Voice listening must be started first. Use `/voice start`.');
+        }
+
+        const currentWhitelist = currentSettings.whitelistedUsers || [];
+        const isWhitelisted = currentWhitelist.includes(targetUser);
+
+        if (isWhitelisted) {
+          // Remove from whitelist
+          const newWhitelist = currentWhitelist.filter(id => id !== targetUser);
+          await voiceService.updateVoiceSettings(workspaceUserId, {
+            whitelistedUsers: newWhitelist
+          });
+          return ephemeral(`✅ Removed <@${targetUser}> from voice whitelist.`);
+        } else {
+          // Add to whitelist
+          const newWhitelist = [...currentWhitelist, targetUser];
+          await voiceService.updateVoiceSettings(workspaceUserId, {
+            whitelistedUsers: newWhitelist
+          });
+          return ephemeral(`✅ Added <@${targetUser}> to voice whitelist.`);
+        }
+
+      default:
+        return ephemeral('❌ Invalid action. Use: start, stop, status, or whitelist.');
+    }
+  } catch (error) {
+    console.error('Error in handleVoiceCommand:', error);
+    return ephemeral('❌ An error occurred while managing voice settings.');
   }
 }
