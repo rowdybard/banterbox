@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAudio } from "@/hooks/use-audio";
-import { Save, Brain, Plus, Star, Crown, Mic, Play, Volume2 } from "lucide-react";
+import { Save, Brain, Plus, Star, Crown, Mic, Play, Volume2, RefreshCw } from "lucide-react";
 import type { UserSettings, User } from "@shared/schema";
 import { isProUser } from "@shared/subscription";
 
