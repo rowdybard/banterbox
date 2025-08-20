@@ -116,23 +116,14 @@ export class PostgresContextService {
 
       let processedContext = recentContext;
 
-      // Smart Context Logic - Use OpenAI to determine if context is needed
-      let shouldUseContext = true;
+      // TEMPORARILY: Always use context if we have any
+      let shouldUseContext = processedContext.length > 0;
       
       console.log(`🔍 Context Internal Debug: processedContext.length=${processedContext.length}, currentMessage="${currentMessage}"`);
-      
-      if (currentMessage && processedContext.length > 0) {
-        // Use OpenAI to analyze if this message needs context
-        shouldUseContext = await this.shouldUseContextWithAI(currentMessage, processedContext);
-        console.log(`🔍 Context Internal Debug: AI context decision: ${shouldUseContext ? 'USE context' : 'SKIP context'} for message: "${currentMessage}"`);
-      } else {
-        // Fallback to rule-based logic
-        shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
-        console.log(`🔍 Context Internal Debug: Rule-based context decision: ${shouldUseContext ? 'USE context' : 'SKIP context'}`);
-      }
+      console.log(`🔍 Context Internal Debug: TEMPORARY - Always use context if available: ${shouldUseContext}`);
       
       if (!shouldUseContext) {
-        console.log('🔍 Context Internal Debug: Smart context logic: Skipping context for this event type');
+        console.log('🔍 Context Internal Debug: No context available, returning empty string');
         return '';
       }
       
@@ -426,8 +417,10 @@ Response:`;
         temperature: 0.1,
       });
 
-      const result = response.choices[0]?.message?.content?.trim().toUpperCase();
-      return result === 'YES';
+             const result = response.choices[0]?.message?.content?.trim().toUpperCase();
+       console.log(`🔍 AI Context Decision Debug: AI response: "${result}" for message: "${currentMessage}"`);
+       console.log(`🔍 AI Context Decision Debug: Context summary: "${contextSummary}"`);
+       return result === 'YES';
     } catch (error) {
       console.error('Error using AI for context decision:', error);
       // Fallback to rule-based logic
