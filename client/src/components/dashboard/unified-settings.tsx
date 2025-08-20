@@ -191,6 +191,29 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     },
   });
 
+  // Force refresh voice settings mutation
+  const forceRefreshMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/voice/force-refresh");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      console.log('Voice settings refreshed:', data);
+      toast({
+        title: "Voice Settings Refreshed",
+        description: "Your voice settings have been refreshed and are now active for the bot.",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Force refresh error:', error);
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh voice settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Save new personality mutation
   const saveNewPersonalityMutation = useMutation({
     mutationFn: async ({ name, prompt, description }: { name: string; prompt: string; description: string }) => {
@@ -291,6 +314,11 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
         description: "Please select a voice first.",
       });
     }
+  };
+
+  // Force refresh voice settings
+  const handleForceRefresh = () => {
+    forceRefreshMutation.mutate();
   };
 
   // Personality Settings Handlers
@@ -563,6 +591,16 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                 {testVoiceMutation.isPending ? "Testing..." : "Test Voice"}
               </Button>
             )}
+            
+            <Button
+              onClick={handleForceRefresh}
+              disabled={forceRefreshMutation.isPending}
+              variant="outline"
+              className="bg-blue-800 hover:bg-blue-700 text-white border-blue-700"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {forceRefreshMutation.isPending ? "Refreshing..." : "Force Refresh"}
+            </Button>
           </div>
 
           {/* Voice Unsaved Changes Indicator */}

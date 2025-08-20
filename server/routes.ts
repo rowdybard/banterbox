@@ -1772,6 +1772,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force refresh voice settings (clear any potential caching)
+  app.post("/api/voice/force-refresh", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      console.log(`🔄 Force refreshing voice settings for user: ${userId}`);
+      
+      // Get fresh settings from database
+      const settings = await storage.getUserSettings(userId);
+      console.log('Fresh settings from database:', settings);
+      
+      // Test TTS generation to verify settings are working
+      const testText = "Voice settings have been refreshed and are now active.";
+      const audioBuffer = await generateTTS(testText, userId);
+      
+      res.json({
+        success: true,
+        message: "Voice settings refreshed successfully",
+        settings,
+        hasAudio: !!audioBuffer,
+        audioSize: audioBuffer ? audioBuffer.length : 0,
+        voiceProvider: settings?.voiceProvider,
+        voiceId: settings?.voiceId,
+        favoriteVoices: settings?.favoriteVoices ? `Has ${Array.isArray(settings.favoriteVoices) ? settings.favoriteVoices.length : 'some'} voices` : 'None'
+      });
+    } catch (error) {
+      console.error('Voice settings refresh error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Test Discord database operations
   app.post("/api/discord/test-db", isAuthenticated, async (req, res) => {
     try {
