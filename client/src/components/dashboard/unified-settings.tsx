@@ -234,17 +234,25 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
     } else if (provider === 'favorite' && (favoriteVoices as any)?.voices?.length > 0) {
       const currentVoiceIsFavorite = (favoriteVoices as any).voices.some((voice: any) =>
-        (voice.baseVoiceId || voice.voiceId) === voiceId
+        voice.id === voiceId
       );
       
       if (!currentVoiceIsFavorite) {
-        setVoiceId((favoriteVoices as any).voices[0].baseVoiceId || (favoriteVoices as any).voices[0].voiceId);
+        setVoiceId((favoriteVoices as any).voices[0].id);
       }
     }
   };
 
   const handleVoiceIdChange = (id: string) => {
     console.log('Voice ID changed to:', id);
+    console.log('Previous voice ID was:', voiceId);
+    console.log('Available voices:', (favoriteVoices as any)?.voices?.map((v: any) => ({ 
+      id: v.id, 
+      name: v.name, 
+      baseVoiceId: v.baseVoiceId, 
+      voiceId: v.voiceId,
+      calculatedValue: v.baseVoiceId || v.voiceId
+    })));
     setVoiceId(id);
     setHasUnsavedVoiceChanges(true);
   };
@@ -467,14 +475,23 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                     <SelectValue placeholder="Select a saved voice..." />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
-                    {(favoriteVoices as any).voices.map((voice: any) => (
-                      <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
-                        <div className="flex items-center space-x-2">
-                          <Star className="h-3 w-3 text-yellow-400" />
-                          <span>{voice.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {(favoriteVoices as any).voices.map((voice: any) => {
+                      const voiceValue = voice.id; // Use the unique voice ID instead of baseVoiceId
+                      console.log('Rendering voice option:', { 
+                        voiceId: voice.id, 
+                        voiceValue, 
+                        name: voice.name,
+                        isSelected: voiceValue === voiceId 
+                      });
+                      return (
+                        <SelectItem key={voice.id} value={voiceValue}>
+                          <div className="flex items-center space-x-2">
+                            <Star className="h-3 w-3 text-yellow-400" />
+                            <span>{voice.name}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (

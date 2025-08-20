@@ -578,9 +578,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (selectedVoiceId && Array.isArray(favoriteVoices) && favoriteVoices.length > 0) {
-          // Find the selected voice in favorites
+          // Find the selected voice in favorites by unique ID
           const selectedVoice = favoriteVoices.find((voice: any) => 
-            voice.baseVoiceId === selectedVoiceId || voice.voiceId === selectedVoiceId
+            voice.id === selectedVoiceId
           );
           
           console.log('Selected voice found:', selectedVoice);
@@ -588,7 +588,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (selectedVoice) {
             const voiceId = selectedVoice.baseVoiceId || selectedVoice.voiceId;
             console.log('Using voice ID for generation:', voiceId);
-            return await elevenLabsService.generateSpeech(enhancedText, voiceId);
+            // Pass the custom settings to the voice generation
+            return await elevenLabsService.generateSpeech(enhancedText, voiceId, selectedVoice.settings);
           }
         }
         
