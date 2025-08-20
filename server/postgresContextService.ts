@@ -71,28 +71,16 @@ export class PostgresContextService {
     currentEventType: EventType,
     guildId?: string
   ): Promise<string> {
-    return this.getContextForBanterInternal(userId, currentEventType, guildId, false);
+    return this.getContextForBanterInternal(userId, currentEventType, guildId);
   }
 
   /**
-   * Gets context prioritizing voice context for direct questions
-   */
-  static async getContextForDirectQuestions(
-    userId: string,
-    currentEventType: EventType,
-    guildId?: string
-  ): Promise<string> {
-    return this.getContextForBanterInternal(userId, currentEventType, guildId, true);
-  }
-
-  /**
-   * Internal method for getting context with voice priority option
+   * Internal method for getting context
    */
   private static async getContextForBanterInternal(
     userId: string,
     currentEventType: EventType,
-    guildId?: string,
-    prioritizeVoice: boolean = false
+    guildId?: string
   ): Promise<string> {
     try {
       console.log(`Getting context for user ${userId}, event type ${currentEventType}, guild ${guildId}`);
@@ -110,23 +98,7 @@ export class PostgresContextService {
         .orderBy(desc(contextMemory.createdAt))
         .limit(50);
 
-      // If prioritizing voice context, filter and sort voice context first
       let processedContext = recentContext;
-      if (prioritizeVoice) {
-        const voiceContext = recentContext.filter(ctx => 
-          ctx.eventType === 'voice_message' || 
-          (ctx.eventData && typeof ctx.eventData === 'object' && 'source' in ctx.eventData && ctx.eventData.source === 'voice')
-        );
-        
-        const textContext = recentContext.filter(ctx => 
-          ctx.eventType !== 'voice_message' && 
-          (!ctx.eventData || typeof ctx.eventData !== 'object' || !('source' in ctx.eventData) || ctx.eventData.source !== 'voice')
-        );
-
-        // Prioritize voice context by putting it first
-        processedContext = [...voiceContext, ...textContext];
-        console.log(`Prioritized context: ${voiceContext.length} voice items, ${textContext.length} text items`);
-      }
 
       // Revolutionary Smart Context Logic - Only use context when it makes sense
       const shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
@@ -364,8 +336,7 @@ export class PostgresContextService {
         return `User ${eventData.displayName || eventData.username} joined the server`;
       case 'discord_reaction':
         return `User ${eventData.displayName || eventData.username} reacted with ${eventData.emoji}`;
-      case 'voice_message':
-        return `Voice message from ${eventData.displayName || eventData.username}: "${eventData.message}"`;
+      
       case 'chat':
         return `Chat message from ${eventData.displayName || eventData.username}`;
       case 'subscription':

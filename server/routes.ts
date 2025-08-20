@@ -231,14 +231,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contextString = "";
       
       if (contextualUserId) {
-        // For direct questions, prioritize voice context
-        if (isDirectQuestionResult) {
-          contextString = await ContextService.getContextForDirectQuestions(contextualUserId, eventType, guildId);
-          console.log(`Voice-prioritized context retrieved for direct question:`, contextString ? 'Has context' : 'No context');
-        } else {
-          contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
-          console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
-        }
+        contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
+        console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
         
         if (contextString) {
           console.log(`Context length: ${contextString.length} characters`);
@@ -1809,37 +1803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test voice simulation endpoint
-  app.post("/api/test-voice-simulation", isAuthenticated, async (req, res) => {
-    try {
-      const { message, guildId } = req.body;
-      const userId = (req.user as any)?.id;
-      
-      if (!message) {
-        return res.status(400).json({ error: 'Message is required' });
-      }
 
-      console.log(`🎤 Testing voice simulation: message="${message}" for user: ${userId}`);
-      
-      const VoiceService = (await import('./voiceService')).VoiceService;
-      const voiceService = VoiceService.getInstance();
-      
-      await voiceService.simulateVoiceActivity(userId, guildId || 'test-guild', message);
-      
-      res.json({
-        success: true,
-        message: 'Voice activity simulated successfully',
-        simulatedMessage: message,
-        userId: userId
-      });
-    } catch (error) {
-      console.error('Voice simulation test error:', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
 
   // Test intelligent detection system with OpenAI analysis
   app.post("/api/test-intelligent-detection", isAuthenticated, async (req, res) => {
@@ -2729,16 +2693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { setDiscordService } = await import('./discord/slash');
     setDiscordService(globalDiscordService);
     
-    // Initialize voice service and connect it to Discord service
-    try {
-      const { VoiceService } = await import('./voiceService');
-      const voiceService = VoiceService.getInstance();
-      voiceService.setDiscordService(globalDiscordService);
-      globalDiscordService.setVoiceService(voiceService);
-      console.log('✅ Voice service initialized and connected to Discord service');
-    } catch (error) {
-      console.error('❌ Failed to initialize voice service:', error);
-    }
+
     
     } catch (error) {
       console.error('❌ Failed to initialize Discord service:', error);
