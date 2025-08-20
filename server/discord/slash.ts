@@ -611,13 +611,28 @@ async function handleVoiceCommand(body: any, guildId: string, userId: string) {
           return ephemeral(`❌ **Permission Denied**\n\n${permission.reason}`);
         }
 
-        // Get user's current voice channel
-        const member = body.member;
-        const voiceState = member?.voice_state;
-        const channelId = voiceState?.channel_id;
+        // Get user's current voice channel by fetching member data
+        let channelId = null;
+        try {
+          // Try to get voice state from the interaction first
+          const member = body.member;
+          const voiceState = member?.voice_state;
+          channelId = voiceState?.channel_id;
+          
+          // If not available in interaction, fetch from Discord API
+          if (!channelId) {
+            const guild = discordService?.client?.guilds?.cache?.get(guildId);
+            if (guild) {
+              const memberData = await guild.members.fetch(userId);
+              channelId = memberData.voice.channelId;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching voice state:', error);
+        }
 
         if (!channelId) {
-          return ephemeral('❌ You must be in a voice channel to start voice listening.');
+          return ephemeral('❌ You must be in a voice channel to start voice listening. Please join a voice channel and try again.');
         }
 
         // Update voice settings
