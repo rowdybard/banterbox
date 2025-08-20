@@ -234,6 +234,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (contextualUserId) {
         contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
         console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
+        if (contextString) {
+          console.log(`Context length: ${contextString.length} characters`);
+        }
       }
 
       let prompt = "";
@@ -1716,6 +1719,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting favorite voice:', error);
       res.status(500).json({ message: "Failed to delete voice" });
+    }
+  });
+
+  // Test frequency filtering behavior
+  app.post("/api/test-frequency-filter", isAuthenticated, async (req, res) => {
+    try {
+      const { message, frequency } = req.body;
+      const userId = (req.user as any)?.id;
+      
+      console.log(`🧪 Testing frequency filter: message="${message}", frequency=${frequency}% for user: ${userId}`);
+      
+      // Test the frequency filter function directly
+      const isDirectQuestionResult = message ? isDirectQuestion(message) : false;
+      const shouldRespond = applyResponseFrequencyFilter(frequency || 50, 'test_event', message);
+      
+      res.json({
+        success: true,
+        message,
+        frequency: frequency || 50,
+        isDirectQuestion: isDirectQuestionResult,
+        shouldRespond,
+        explanation: isDirectQuestionResult 
+          ? "Direct question detected - should always respond regardless of frequency"
+          : shouldRespond 
+            ? "Random check passed - would respond"
+            : "Random check failed - would not respond"
+      });
+    } catch (error) {
+      console.error('Frequency filter test error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
@@ -4311,7 +4347,23 @@ function isDirectQuestion(message: string): boolean {
     /what did they say/i,
     /what was the response/i,
     /what did you respond/i,
-    /what was your answer/i
+    /what was your answer/i,
+    /what did we discuss/i,
+    /what was the topic/i,
+    /what were we talking about/i,
+    /what did you just say/i,
+    /what was that about/i,
+    /what did you mean by that/i,
+    /can you explain that/i,
+    /what was the context/i,
+    /what did you respond to/i,
+    /what was the question/i,
+    /what did someone ask/i,
+    /what was the last response/i,
+    /what did you just respond/i,
+    /what was the previous message/i,
+    /what did you say before/i,
+    /what was the earlier conversation/i
   ];
   
   // Check if message matches any direct question pattern
@@ -4324,6 +4376,13 @@ function isDirectQuestion(message: string): boolean {
 function applyResponseFrequencyFilter(responseFrequency: number, responseReason: string, originalMessage: string): boolean {
   // Always respond to direct mentions regardless of frequency setting
   if (responseReason === 'direct mention') {
+    return true;
+  }
+
+  // Always respond to direct questions about recent events or what BanterBox said
+  // These need context and should always be answered regardless of frequency setting
+  if (originalMessage && isDirectQuestion(originalMessage)) {
+    console.log(`Response frequency check: ALLOWED - Direct question detected: "${originalMessage}" (frequency: ${responseFrequency}%)`);
     return true;
   }
 
