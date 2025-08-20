@@ -27,9 +27,10 @@ export class ContextService {
   static async getContextForBanter(
     userId: string,
     currentEventType: EventType,
-    guildId?: string
+    guildId?: string,
+    currentMessage?: string
   ): Promise<string> {
-    return PostgresContextService.getContextForBanter(userId, currentEventType, guildId);
+    return PostgresContextService.getContextForBanter(userId, currentEventType, guildId, currentMessage);
   }
 
   /**

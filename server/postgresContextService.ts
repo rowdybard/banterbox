@@ -69,9 +69,10 @@ export class PostgresContextService {
   static async getContextForBanter(
     userId: string,
     currentEventType: EventType,
-    guildId?: string
+    guildId?: string,
+    currentMessage?: string
   ): Promise<string> {
-    return this.getContextForBanterInternal(userId, currentEventType, guildId);
+    return this.getContextForBanterInternal(userId, currentEventType, guildId, currentMessage);
   }
 
   /**
@@ -80,7 +81,8 @@ export class PostgresContextService {
   private static async getContextForBanterInternal(
     userId: string,
     currentEventType: EventType,
-    guildId?: string
+    guildId?: string,
+    currentMessage?: string
   ): Promise<string> {
     try {
       console.log(`Getting context for user ${userId}, event type ${currentEventType}, guild ${guildId}`);
@@ -100,8 +102,18 @@ export class PostgresContextService {
 
       let processedContext = recentContext;
 
-      // Revolutionary Smart Context Logic - Only use context when it makes sense
-      const shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
+      // Smart Context Logic - Use OpenAI to determine if context is needed
+      let shouldUseContext = true;
+      
+      if (currentMessage && processedContext.length > 0) {
+        // Use OpenAI to analyze if this message needs context
+        shouldUseContext = await this.shouldUseContextWithAI(currentMessage, processedContext);
+        console.log(`AI context decision: ${shouldUseContext ? 'USE context' : 'SKIP context'} for message: "${currentMessage}"`);
+      } else {
+        // Fallback to rule-based logic
+        shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
+        console.log(`Rule-based context decision: ${shouldUseContext ? 'USE context' : 'SKIP context'}`);
+      }
       
       if (!shouldUseContext) {
         console.log('Smart context logic: Skipping context for this event type');
@@ -351,20 +363,81 @@ export class PostgresContextService {
   }
 
   /**
+   * Uses OpenAI to determine if context should be used for a specific message
+   */
+  private static async shouldUseContextWithAI(currentMessage: string, recentContext: any[]): Promise<boolean> {
+    try {
+      // Import OpenAI dynamically to avoid circular dependencies
+      const { OpenAI } = await import('openai');
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      // Create a summary of recent context
+      const contextSummary = recentContext
+        .slice(0, 3) // Take last 3 context items
+        .map(ctx => ctx.originalMessage || ctx.contextSummary)
+        .filter(Boolean)
+        .join(' | ');
+
+      const prompt = `Analyze if this message needs context from recent conversation.
+
+Current message: "${currentMessage}"
+
+Recent context: "${contextSummary}"
+
+Determine if the current message:
+1. References or asks about something from the recent context
+2. Is a follow-up question or clarification
+3. Needs context to be properly understood or answered
+4. Is a direct question about previous conversation
+
+Respond with ONLY "YES" if context is needed, or "NO" if context is not needed.
+
+Examples:
+- "what did I just say?" → YES (needs context)
+- "what car did I mention?" → YES (needs context)  
+- "hello there" → NO (doesn't need context)
+- "how are you?" → NO (doesn't need context)
+- "what was that about?" → YES (needs context)
+
+Response:`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 10,
+        temperature: 0.1,
+      });
+
+      const result = response.choices[0]?.message?.content?.trim().toUpperCase();
+      return result === 'YES';
+    } catch (error) {
+      console.error('Error using AI for context decision:', error);
+      // Fallback to rule-based logic
+      return this.shouldUseContextForEvent('discord_message', recentContext.length);
+    }
+  }
+
+  /**
    * Determines if context should be used for a given event type
    */
   private static shouldUseContextForEvent(eventType: EventType, contextCount: number): boolean {
-    // Don't use context for very frequent events to avoid overwhelming
-    if (eventType === 'discord_message' && contextCount > 20) {
-      return Math.random() < 0.3; // 30% chance
-    }
-    
     // Always use context for important events
     if (['subscription', 'donation', 'raid'].includes(eventType)) {
       return true;
     }
     
-    // Use context for other events with some randomness
-    return Math.random() < 0.7; // 70% chance
+    // For Discord messages, be more permissive with context
+    if (eventType === 'discord_message') {
+      // Use context more often, especially if we have recent context
+      if (contextCount > 0) {
+        return Math.random() < 0.8; // 80% chance if we have context
+      }
+      return Math.random() < 0.6; // 60% chance even without recent context
+    }
+    
+    // Use context for other events with high probability
+    return Math.random() < 0.8; // 80% chance
   }
 }

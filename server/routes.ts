@@ -231,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contextString = "";
       
       if (contextualUserId) {
-        contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId);
+        contextString = await ContextService.getContextForBanter(contextualUserId, eventType, guildId, originalMessage);
         console.log(`Context retrieved for user ${contextualUserId}:`, contextString ? 'Has context' : 'No context');
         
         if (contextString) {
