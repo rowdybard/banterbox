@@ -6,6 +6,7 @@ import BanterQueue from "@/components/dashboard/banter-queue";
 import StatsUpgrade from "@/components/dashboard/stats-upgrade";
 import { UsageDashboard } from "@/components/dashboard/usage-dashboard";
 import BillingDashboard from "@/components/dashboard/billing-dashboard";
+import AdminPanel from "@/components/dashboard/admin-panel";
 
 import { LoadingState } from "@/components/ui/loading-state";
 
@@ -74,6 +75,11 @@ export default function Dashboard() {
           {/* Billing Dashboard */}
           <div className="lg:col-span-2 xl:col-span-1">
             <BillingDashboard />
+          </div>
+
+          {/* Admin Panel - Only visible to maxpug17@gmail.com */}
+          <div className="lg:col-span-2 xl:col-span-2">
+            <AdminPanel userId={userId} />
           </div>
 
           {/* Banter History */}

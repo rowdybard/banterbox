@@ -118,6 +118,9 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     retry: false,
   });
 
+  // Debug favorite voices
+  console.log('Favorite voices data:', favoriteVoices);
+
   // Update settings mutation
   const updateSettingsMutation = useMutation({
     mutationFn: async (updates: Partial<UserSettings>) => {
@@ -229,11 +232,11 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
     } else if (provider === 'favorite' && (favoriteVoices as any)?.voices?.length > 0) {
       const currentVoiceIsFavorite = (favoriteVoices as any).voices.some((voice: any) =>
-        voice.baseVoiceId === voiceId || voice.voiceId === voiceId
+        voice.voiceId === voiceId
       );
       
       if (!currentVoiceIsFavorite) {
-        setVoiceId((favoriteVoices as any).voices[0].baseVoiceId || (favoriteVoices as any).voices[0].voiceId);
+        setVoiceId((favoriteVoices as any).voices[0].voiceId);
       }
     }
   };
@@ -446,30 +449,36 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
           )}
 
           {/* Favorite Voice Selection */}
-          {voiceProvider === 'favorite' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (favoriteVoices as any)?.voices?.length > 0 && (
+          {voiceProvider === 'favorite' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (
             <div>
               <Label className="text-sm font-medium text-gray-300 mb-2 block">
                 Saved Voice
               </Label>
-              <Select 
-                value={voiceId}
-                onValueChange={handleVoiceIdChange}
-                data-testid="select-favorite-voice"
-              >
-                <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
-                  <SelectValue placeholder="Select a saved voice..." />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {(favoriteVoices as any).voices.map((voice: any) => (
-                    <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
-                      <div className="flex items-center space-x-2">
-                        <Star className="h-3 w-3 text-yellow-400" />
-                        <span>{voice.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {(favoriteVoices as any)?.voices?.length > 0 ? (
+                <Select 
+                  value={voiceId}
+                  onValueChange={handleVoiceIdChange}
+                  data-testid="select-favorite-voice"
+                >
+                  <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Select a saved voice..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {(favoriteVoices as any).voices.map((voice: any) => (
+                      <SelectItem key={voice.id} value={voice.voiceId}>
+                        <div className="flex items-center space-x-2">
+                          <Star className="h-3 w-3 text-yellow-400" />
+                          <span>{voice.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-gray-400 p-3 bg-gray-800 rounded border border-gray-700">
+                  No saved voices found. Create custom voices in the Voice Builder to see them here.
+                </div>
+              )}
             </div>
           )}
 

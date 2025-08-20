@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { ObjectStorageService } from "./objectStorage";
 import { firebaseStorage } from "./firebase";
-import { insertBanterItemSchema, insertUserSettingsSchema, type EventType, type EventData, guildLinks, linkCodes, discordSettings, users, marketplaceVoices } from "@shared/schema";
+import { insertBanterItemSchema, insertUserSettingsSchema, type EventType, type EventData, guildLinks, linkCodes, discordSettings, users, marketplaceVoices, marketplacePersonalities } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { getTierConfig } from "@shared/billing";
@@ -2440,6 +2440,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Optional: DISCORD_CLIENT_SECRET');
   }
 
+  // Admin API routes - Only accessible to maxpug17@gmail.com
+  app.get("/api/admin/pending-voices", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
+      
+      // Get voices with pending moderation status
+      const pendingVoices = await marketplaceService.getVoices({ 
+        onlyApproved: false,
+        limit: 100
+      });
+
+      // Filter to only pending voices
+      const filteredVoices = pendingVoices.filter(voice => 
+        voice.moderationStatus === 'pending'
+      );
+
+      res.json(filteredVoices);
+    } catch (error) {
+      console.error('Error fetching pending voices:', error);
+      res.status(500).json({ message: "Failed to fetch pending voices" });
+    }
+  });
+
+  app.get("/api/admin/pending-personalities", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
+      
+      // Get personalities with pending moderation status
+      const pendingPersonalities = await marketplaceService.getPersonalities({ 
+        onlyApproved: false,
+        limit: 100
+      });
+
+      // Filter to only pending personalities
+      const filteredPersonalities = pendingPersonalities.filter(personality => 
+        personality.moderationStatus === 'pending'
+      );
+
+      res.json(filteredPersonalities);
+    } catch (error) {
+      console.error('Error fetching pending personalities:', error);
+      res.status(500).json({ message: "Failed to fetch pending personalities" });
+    }
+  });
+
+  app.post("/api/admin/approve-voice/:voiceId", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { voiceId } = req.params;
+      
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      // Update voice moderation status to approved
+      await db
+        .update(marketplaceVoices)
+        .set({ 
+          moderationStatus: 'approved',
+          moderatedAt: new Date(),
+          moderatedBy: user.id
+        })
+        .where(eq(marketplaceVoices.id, voiceId));
+
+      res.json({ success: true, message: "Voice approved successfully" });
+    } catch (error) {
+      console.error('Error approving voice:', error);
+      res.status(500).json({ message: "Failed to approve voice" });
+    }
+  });
+
+  app.post("/api/admin/reject-voice/:voiceId", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { voiceId } = req.params;
+      const { reason } = req.body;
+      
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      // Update voice moderation status to rejected
+      await db
+        .update(marketplaceVoices)
+        .set({ 
+          moderationStatus: 'rejected',
+          moderationNotes: reason,
+          moderatedAt: new Date(),
+          moderatedBy: user.id,
+          isActive: false
+        })
+        .where(eq(marketplaceVoices.id, voiceId));
+
+      res.json({ success: true, message: "Voice rejected successfully" });
+    } catch (error) {
+      console.error('Error rejecting voice:', error);
+      res.status(500).json({ message: "Failed to reject voice" });
+    }
+  });
+
+  app.post("/api/admin/approve-personality/:personalityId", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { personalityId } = req.params;
+      
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      // Update personality moderation status to approved
+      await db
+        .update(marketplacePersonalities)
+        .set({ 
+          moderationStatus: 'approved',
+          moderatedAt: new Date(),
+          moderatedBy: user.id
+        })
+        .where(eq(marketplacePersonalities.id, personalityId));
+
+      res.json({ success: true, message: "Personality approved successfully" });
+    } catch (error) {
+      console.error('Error approving personality:', error);
+      res.status(500).json({ message: "Failed to approve personality" });
+    }
+  });
+
+  app.post("/api/admin/reject-personality/:personalityId", isAuthenticated, async (req, res) => {
+    try {
+      const user = (req.user as any);
+      if (user?.email !== "maxpug17@gmail.com") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { personalityId } = req.params;
+      const { reason } = req.body;
+      
+      if (!db) {
+        return res.status(503).json({ message: "Database not available" });
+      }
+
+      // Update personality moderation status to rejected
+      await db
+        .update(marketplacePersonalities)
+        .set({ 
+          moderationStatus: 'rejected',
+          moderationNotes: reason,
+          moderatedAt: new Date(),
+          moderatedBy: user.id,
+          isActive: false
+        })
+        .where(eq(marketplacePersonalities.id, personalityId));
+
+      res.json({ success: true, message: "Personality rejected successfully" });
+    } catch (error) {
+      console.error('Error rejecting personality:', error);
+      res.status(500).json({ message: "Failed to reject personality" });
+    }
+  });
+
   // Marketplace API routes
   app.get("/api/marketplace/personalities", async (req, res) => {
     try {
@@ -3446,7 +3637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             downloads: 0,
             upvotes: 0,
             downvotes: 0,
-            moderationStatus: 'approved' // Auto-approve all marketplace uploads
+            moderationStatus: 'pending' // Require admin approval for marketplace uploads
           };
           
           console.log('Marketplace voice data:', marketplaceVoiceData); // Debug log
