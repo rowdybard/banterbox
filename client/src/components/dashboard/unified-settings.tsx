@@ -255,7 +255,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setVoiceId('');
     } else if (provider === 'elevenlabs' && !voiceId) {
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
-
+    }
   };
 
   const handleVoiceIdChange = (id: string) => {
