@@ -224,6 +224,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if this is a direct question about what just happened or what BanterBox said
+      const isDirectQuestionResult = originalMessage ? isDirectQuestion(originalMessage) : false;
+      
       // Get conversation context AFTER recording current event
       let contextString = "";
       
@@ -256,9 +259,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`DEBUG: Final personality context for user ${userId}:`, personalityContext.substring(0, 100) + '...');
-      
-      // Check if this is a direct question about what just happened or what BanterBox said
-      const isDirectQuestionResult = originalMessage ? isDirectQuestion(originalMessage) : false;
       
       if (isDirectQuestionResult) {
         console.log(`DEBUG: Detected direct question: "${originalMessage}" - will provide factual answer`);
