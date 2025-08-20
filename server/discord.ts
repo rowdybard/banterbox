@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Events, Message, GuildMember, VoiceState } from 'discord.js';
-import { joinVoiceChannel, VoiceConnection, getVoiceConnection } from '@discordjs/voice';
+import { joinVoiceChannel, VoiceConnection, getVoiceConnection, createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior, entersState, VoiceConnectionStatus } from '@discordjs/voice';
 
 /**
  * Detects if a message is a direct question about recent events or what BanterBox said
@@ -494,9 +494,6 @@ export class DiscordService {
     try {
       console.log('🎤 Setting up voice processing...');
       
-      // Import required voice components
-      const { createAudioPlayer, createAudioResource, AudioPlayerStatus, NoSubscriberBehavior } = require('@discordjs/voice');
-      
       // Create audio player
       const player = createAudioPlayer({
         behaviors: {
@@ -588,8 +585,7 @@ export class DiscordService {
         debug: false, // Disable debug logging to reduce noise
       });
 
-      // Import entersState function
-      const { entersState, VoiceConnectionStatus } = await import('@discordjs/voice');
+      // Use imported entersState function
       
       // Wait for connection to be ready with increased timeout and better error handling
       try {
@@ -678,16 +674,10 @@ export class DiscordService {
         return false;
       }
 
-      // Import voice modules dynamically
-      const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, entersState } = await import('@discordjs/voice');
-      
       // Create audio resource with more compatible settings for Replit
       console.log(`Creating audio resource from: ${audioUrl}`);
       
       // URL conversion and testing is now done below
-      
-      // Import the NoSubscriberBehavior enum
-      const { NoSubscriberBehavior } = await import('@discordjs/voice');
       
       // Create audio player with better error handling
       const player = createAudioPlayer({
