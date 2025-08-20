@@ -86,12 +86,10 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   // Update local state when settings change
   useEffect(() => {
     if (settings) {
-      // Voice settings
-      setVoiceProvider(settings.voiceProvider || 'openai');
-      
       // Handle voice ID - check if it's a favorite voice
       let initialVoiceId = settings.voiceId || '';
       let initialVoiceType: 'base' | 'favorite' | null = null;
+      let initialVoiceProvider = settings.voiceProvider || 'openai';
       
       if (initialVoiceId && favoriteVoices?.voices) {
         // Check if this voiceId matches any favorite voice's actual voice ID
@@ -102,14 +100,17 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
           // Use the favorite voice's unique ID for the select component
           initialVoiceId = matchingFavorite.id;
           initialVoiceType = 'favorite';
+          initialVoiceProvider = 'favorite'; // Set provider to favorite
           console.log(`Found matching favorite voice: ${matchingFavorite.name}, using ID: ${initialVoiceId}`);
         } else if (Array.isArray(elevenLabsVoices) && elevenLabsVoices.some((v: any) => v.id === initialVoiceId)) {
           // It's a base voice
           initialVoiceType = 'base';
+          initialVoiceProvider = 'elevenlabs'; // Ensure provider is elevenlabs
         }
       }
       setVoiceId(initialVoiceId);
       setVoiceType(initialVoiceType);
+      setVoiceProvider(initialVoiceProvider);
       
       setVolume(settings.volume || 75);
       setAutoPlay(settings.autoPlay ?? true);
@@ -295,8 +296,17 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     // Reset voice ID when switching providers
     if (provider === 'openai') {
       setVoiceId('');
-    } else if (provider === 'elevenlabs' && !voiceId) {
+      setVoiceType(null);
+    } else if (provider === 'elevenlabs') {
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
+      setVoiceType('base');
+    } else if (provider === 'favorite' && favoriteVoices?.voices?.length > 0) {
+      // Set to first available favorite voice
+      setVoiceId(favoriteVoices.voices[0].id);
+      setVoiceType('favorite');
+    } else {
+      setVoiceId('');
+      setVoiceType(null);
     }
   };
 
@@ -336,7 +346,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
   // Test current voice
   const handleTestVoice = () => {
-    if (voiceProvider === 'elevenlabs' && voiceId) {
+    if ((voiceProvider === 'elevenlabs' || voiceProvider === 'favorite') && voiceId) {
       // Get the actual voice ID based on the voice type
       let actualVoiceId = voiceId;
       if (voiceType === 'favorite' && favoriteVoices?.voices) {
@@ -416,8 +426,8 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     }
 
     const updates: Partial<UserSettings> = {
-      voiceProvider,
-      voiceId: (voiceProvider === 'elevenlabs') ? actualVoiceId : undefined,
+      voiceProvider: voiceProvider === 'favorite' ? 'elevenlabs' : voiceProvider, // Save as elevenlabs for favorites
+      voiceId: (voiceProvider === 'elevenlabs' || voiceProvider === 'favorite') ? actualVoiceId : undefined,
       volume,
       autoPlay,
     };
@@ -480,6 +490,9 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                 <SelectItem value="elevenlabs" disabled={!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise')}>
                   ElevenLabs Premium {!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && '(Pro Required)'}
                 </SelectItem>
+                <SelectItem value="favorite" disabled={!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') || !(favoriteVoices as any)?.voices?.length}>
+                  ElevenLabs Favorites {!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && '(Pro Required)'} {!(favoriteVoices as any)?.voices?.length && '(No Saved Voices)'}
+                </SelectItem>
                 <SelectItem value="custom" disabled={!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise')}>
                   Custom Voice Clone {!(user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && '(Pro Required)'}
                 </SelectItem>
@@ -493,57 +506,54 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
           {/* ElevenLabs Voice Selection */}
           {voiceProvider === 'elevenlabs' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (
-            <div className="space-y-4">
-              {/* Base ElevenLabs Voices */}
-              <div>
-                <Label className="text-sm font-medium text-gray-300 mb-2 block">
-                  Base ElevenLabs Voices
-                </Label>
-                <Select 
-                  value={isBaseVoice ? voiceId : ''}
-                  onValueChange={(id) => handleVoiceIdChange(id, 'base')}
-                  data-testid="select-base-voice"
-                >
-                  <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Select a base voice..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {(Array.isArray(elevenLabsVoices) ? elevenLabsVoices : [])?.map((voice: any) => (
-                      <SelectItem key={voice.id} value={voice.id}>
-                        {voice.name} - {voice.description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-300 mb-2 block">
+                ElevenLabs Voice
+              </Label>
+              <Select 
+                value={voiceId}
+                onValueChange={(id) => handleVoiceIdChange(id, 'base')}
+                data-testid="select-elevenlabs-voice"
+              >
+                <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="Select a voice..." />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  {(Array.isArray(elevenLabsVoices) ? elevenLabsVoices : [])?.map((voice: any) => (
+                    <SelectItem key={voice.id} value={voice.id}>
+                      {voice.name} - {voice.description}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-              {/* Favorite Voices */}
-              {(favoriteVoices as any)?.voices?.length > 0 && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-300 mb-2 block">
-                    Saved Favorite Voices
-                  </Label>
-                  <Select 
-                    value={isFavoriteVoice ? voiceId : ''}
-                    onValueChange={(id) => handleVoiceIdChange(id, 'favorite')}
-                    data-testid="select-favorite-voice"
-                  >
-                    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
-                      <SelectValue placeholder="Select a saved voice..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {(favoriteVoices as any).voices.map((voice: any) => (
-                        <SelectItem key={voice.id} value={voice.id}>
-                          <div className="flex items-center space-x-2">
-                            <Star className="h-3 w-3 text-yellow-400" />
-                            <span>{voice.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+          {/* Favorite Voices Selection */}
+          {voiceProvider === 'favorite' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (favoriteVoices as any)?.voices?.length > 0 && (
+            <div>
+              <Label className="text-sm font-medium text-gray-300 mb-2 block">
+                Saved Favorite Voice
+              </Label>
+              <Select 
+                value={voiceId}
+                onValueChange={(id) => handleVoiceIdChange(id, 'favorite')}
+                data-testid="select-favorite-voice"
+              >
+                <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="Select a saved voice..." />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  {(favoriteVoices as any).voices.map((voice: any) => (
+                    <SelectItem key={voice.id} value={voice.id}>
+                      <div className="flex items-center space-x-2">
+                        <Star className="h-3 w-3 text-yellow-400" />
+                        <span>{voice.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
