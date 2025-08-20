@@ -1,10 +1,10 @@
-import { FirebaseContextService } from "./firebaseContextService.js";
+import { PostgresContextService } from "./postgresContextService.js";
 import type { EventType, EventData } from "../shared/schema.js";
 
 /**
  * Context Memory Service
  * Manages AI context memory for creating more coherent, contextual banter responses
- * Uses Firebase Firestore for storage
+ * Uses PostgreSQL for storage
  */
 export class ContextService {
   /**
@@ -18,7 +18,7 @@ export class ContextService {
     importance: number = 1,
     originalMessage?: string
   ): Promise<string> {
-    return FirebaseContextService.recordEvent(userId, eventType, eventData, guildId, importance, originalMessage);
+    return PostgresContextService.recordEvent(userId, eventType, eventData, guildId, importance, originalMessage);
   }
 
   /**
@@ -29,7 +29,7 @@ export class ContextService {
     currentEventType: EventType,
     guildId?: string
   ): Promise<string> {
-    return FirebaseContextService.getContextForBanter(userId, currentEventType, guildId);
+    return PostgresContextService.getContextForBanter(userId, currentEventType, guildId);
   }
 
   /**
@@ -42,21 +42,21 @@ export class ContextService {
     banterText: string,
     guildId?: string
   ): Promise<void> {
-    return FirebaseContextService.recordBanterSuccess(userId, eventType, eventData, banterText, guildId);
+    return PostgresContextService.recordBanterSuccess(userId, eventType, eventData, banterText, guildId);
   }
 
   /**
    * Updates a context memory with the banter response
    */
   static async updateContextResponse(contextId: string, banterResponse: string): Promise<void> {
-    return FirebaseContextService.updateContextResponse(contextId, banterResponse);
+    return PostgresContextService.updateContextResponse(contextId, banterResponse);
   }
 
   /**
    * Cleans expired context memory
    */
   static async cleanExpiredContext(): Promise<number> {
-    return FirebaseContextService.cleanExpiredContext();
+    return PostgresContextService.cleanExpiredContext();
   }
 
   /**
@@ -66,6 +66,6 @@ export class ContextService {
     userId: string,
     guildId?: string
   ): Promise<{ totalEvents: number; recentActivity: string; topEventTypes: string[] }> {
-    return FirebaseContextService.getStreamActivitySummary(userId, guildId);
+    return PostgresContextService.getStreamActivitySummary(userId, guildId);
   }
 }

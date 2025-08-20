@@ -1,8 +1,9 @@
 import { Express } from 'express';
 import { isAuthenticated } from './localAuth';
-import { firebaseMarketplaceService } from './firebaseMarketplace';
+import { MarketplaceService } from './marketplace';
 
 export function registerMarketplaceEndpoints(app: Express) {
+  const marketplaceService = new MarketplaceService();
   // Rating endpoints
   app.post("/api/marketplace/:itemType/:itemId/rate", isAuthenticated, async (req: any, res) => {
     try {
@@ -18,7 +19,7 @@ export function registerMarketplaceEndpoints(app: Express) {
         return res.status(400).json({ message: "Rating must be 1 (upvote) or -1 (downvote)" });
       }
       
-      await firebaseMarketplaceService.rateItem(userId, itemType as 'voice' | 'personality', itemId, rating);
+      await marketplaceService.rateItem(userId, itemType as 'voice' | 'personality', itemId, rating);
       
       res.json({ 
         success: true, 
@@ -40,7 +41,7 @@ export function registerMarketplaceEndpoints(app: Express) {
         return res.status(400).json({ message: "Invalid item type" });
       }
       
-      const rating = await firebaseMarketplaceService.getUserRating(
+      const rating = await marketplaceService.getUserRating(
         userId, 
         itemType as 'voice' | 'personality', 
         itemId
@@ -71,7 +72,7 @@ export function registerMarketplaceEndpoints(app: Express) {
         });
       }
       
-      const report = await firebaseMarketplaceService.reportContent({
+      const report = await marketplaceService.reportContent({
         reporterId,
         itemType: itemType as 'voice' | 'personality',
         itemId,
@@ -95,7 +96,7 @@ export function registerMarketplaceEndpoints(app: Express) {
   app.get("/api/marketplace/my-items", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const items = await firebaseMarketplaceService.getUserMarketplaceItems(userId);
+      const items = await marketplaceService.getUserMarketplaceItems(userId);
       
       res.json(items);
     } catch (error) {
@@ -110,7 +111,7 @@ export function registerMarketplaceEndpoints(app: Express) {
   app.get("/api/admin/marketplace/moderation/pending", isAuthenticated, async (req: any, res) => {
     try {
       // TODO: Add admin role check
-      const pendingItems = await firebaseMarketplaceService.getPendingModerationItems();
+      const pendingItems = await marketplaceService.getPendingModerationItems();
       
       res.json(pendingItems);
     } catch (error) {
@@ -136,7 +137,7 @@ export function registerMarketplaceEndpoints(app: Express) {
         return res.status(400).json({ message: "Status must be 'approved' or 'rejected'" });
       }
       
-      await firebaseMarketplaceService.moderateItem(
+      await marketplaceService.moderateItem(
         itemType as 'voice' | 'personality',
         itemId,
         status as 'approved' | 'rejected',
@@ -161,7 +162,7 @@ export function registerMarketplaceEndpoints(app: Express) {
       
       // TODO: Add admin role check
       
-      const reports = await firebaseMarketplaceService.getContentReports(status as string);
+      const reports = await marketplaceService.getContentReports(status as string);
       
       res.json(reports);
     } catch (error) {
@@ -183,7 +184,7 @@ export function registerMarketplaceEndpoints(app: Express) {
         return res.status(400).json({ message: "Status must be 'resolved' or 'dismissed'" });
       }
       
-      await firebaseMarketplaceService.reviewReport(
+      await marketplaceService.reviewReport(
         reportId,
         reviewerId,
         status as 'resolved' | 'dismissed',

@@ -182,7 +182,38 @@ async function migrate() {
       console.log('✅ originalMessage column already exists in banter_items');
     }
     
-    // 10. Add originalMessage column to context_memory table
+    // 10. Create context_memory table if it doesn't exist
+    const contextMemoryTableCheck = await client.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'context_memory'
+    `);
+    
+    if (contextMemoryTableCheck.rows.length === 0) {
+      console.log('➕ Creating context_memory table...');
+      await client.query(`
+        CREATE TABLE context_memory (
+          id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+          user_id VARCHAR,
+          guild_id VARCHAR,
+          event_type VARCHAR NOT NULL,
+          event_data JSONB,
+          context_summary TEXT NOT NULL,
+          original_message TEXT,
+          banter_response TEXT,
+          importance INTEGER DEFAULT 1,
+          participants TEXT[] DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          expires_at TIMESTAMP NOT NULL,
+          PRIMARY KEY (id)
+        )
+      `);
+      console.log('✅ context_memory table created successfully');
+    } else {
+      console.log('✅ context_memory table already exists');
+    }
+    
+    // 11. Add originalMessage column to context_memory table (if not already present)
     const contextOriginalMessageCheck = await client.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -200,7 +231,7 @@ async function migrate() {
       console.log('✅ originalMessage column already exists in context_memory');
     }
     
-    // 11. Add banterResponse column to context_memory table
+    // 12. Add banterResponse column to context_memory table
     const contextBanterResponseCheck = await client.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -218,7 +249,7 @@ async function migrate() {
       console.log('✅ banterResponse column already exists in context_memory');
     }
     
-    // 12. Create sessions table if it doesn't exist
+    // 13. Create sessions table if it doesn't exist
     const sessionsTableCheck = await client.query(`
       SELECT table_name 
       FROM information_schema.tables 
@@ -239,7 +270,7 @@ async function migrate() {
       console.log('✅ Sessions table already exists');
     }
     
-    // 13. Create unique index on sessions.sid if it doesn't exist
+    // 14. Create unique index on sessions.sid if it doesn't exist
     const sessionsSidIndexCheck = await client.query(`
       SELECT indexname 
       FROM pg_indexes 
@@ -256,7 +287,7 @@ async function migrate() {
       console.log('✅ Sessions sid index already exists');
     }
     
-    // 14. Create index on sessions.expire if it doesn't exist
+    // 15. Create index on sessions.expire if it doesn't exist
     const sessionsExpireIndexCheck = await client.query(`
       SELECT indexname 
       FROM pg_indexes 
@@ -273,7 +304,7 @@ async function migrate() {
       console.log('✅ Sessions expire index already exists');
     }
     
-    // 15. Add participants column to context_memory table
+    // 16. Add participants column to context_memory table
     const contextParticipantsCheck = await client.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -343,6 +374,333 @@ async function migrate() {
       console.log('✅ response_frequency column added successfully');
     } else {
       console.log('✅ response_frequency column already exists');
+    }
+
+    // 19. Create missing tables if they don't exist
+    const missingTables = [
+      'user_api_keys',
+      'billing_info', 
+      'usage_tracking',
+      'banter_items',
+      'user_settings',
+      'daily_stats',
+      'twitch_settings',
+      'link_codes',
+      'guild_links',
+      'guild_settings',
+      'marketplace_voices',
+      'marketplace_personalities',
+      'user_downloads',
+      'user_ratings',
+      'content_reports',
+      'discord_settings'
+    ];
+
+    for (const tableName of missingTables) {
+      const tableCheck = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = '${tableName}'
+      `);
+      
+      if (tableCheck.rows.length === 0) {
+        console.log(`➕ Creating ${tableName} table...`);
+        
+        switch (tableName) {
+          case 'user_api_keys':
+            await client.query(`
+              CREATE TABLE user_api_keys (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR NOT NULL,
+                provider TEXT NOT NULL,
+                api_key TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                last_used_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'billing_info':
+            await client.query(`
+              CREATE TABLE billing_info (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR NOT NULL,
+                customer_id VARCHAR,
+                name VARCHAR,
+                email VARCHAR,
+                address JSONB,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'usage_tracking':
+            await client.query(`
+              CREATE TABLE usage_tracking (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR NOT NULL,
+                date TEXT NOT NULL,
+                banters_generated INTEGER DEFAULT 0,
+                openai_tokens_used INTEGER DEFAULT 0,
+                elevenlabs_characters_used INTEGER DEFAULT 0,
+                audio_minutes_generated INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'banter_items':
+            await client.query(`
+              CREATE TABLE banter_items (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR,
+                original_message TEXT,
+                banter_text TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                event_data JSONB,
+                audio_url TEXT,
+                is_played BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'user_settings':
+            await client.query(`
+              CREATE TABLE user_settings (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR UNIQUE,
+                voice_provider TEXT DEFAULT 'openai',
+                voice_id TEXT,
+                auto_play BOOLEAN DEFAULT true,
+                volume INTEGER DEFAULT 75,
+                response_frequency INTEGER DEFAULT 50,
+                enabled_events JSONB DEFAULT '["chat"]',
+                overlay_position TEXT DEFAULT 'bottom-center',
+                overlay_duration INTEGER DEFAULT 12,
+                overlay_animation TEXT DEFAULT 'fade',
+                banter_personality TEXT DEFAULT 'context',
+                custom_personality_prompt TEXT,
+                favorite_personalities JSONB DEFAULT '[]',
+                favorite_voices JSONB DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'daily_stats':
+            await client.query(`
+              CREATE TABLE daily_stats (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR,
+                date TEXT NOT NULL,
+                banters_generated INTEGER DEFAULT 0,
+                banters_played INTEGER DEFAULT 0,
+                chat_responses INTEGER DEFAULT 0,
+                audio_generated INTEGER DEFAULT 0,
+                viewer_engagement INTEGER DEFAULT 0,
+                peak_hour INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'twitch_settings':
+            await client.query(`
+              CREATE TABLE twitch_settings (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR UNIQUE,
+                access_token TEXT,
+                refresh_token TEXT,
+                channel_id VARCHAR,
+                enabled_events JSONB DEFAULT '["chat"]',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'link_codes':
+            await client.query(`
+              CREATE TABLE link_codes (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                code VARCHAR UNIQUE NOT NULL,
+                workspace_id VARCHAR NOT NULL,
+                guild_id VARCHAR,
+                is_used BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'guild_links':
+            await client.query(`
+              CREATE TABLE guild_links (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                workspace_id VARCHAR NOT NULL,
+                guild_id VARCHAR UNIQUE NOT NULL,
+                guild_name VARCHAR,
+                active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'guild_settings':
+            await client.query(`
+              CREATE TABLE guild_settings (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                guild_id VARCHAR UNIQUE,
+                enabled_events JSONB DEFAULT '["chat"]',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'marketplace_voices':
+            await client.query(`
+              CREATE TABLE marketplace_voices (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                name VARCHAR NOT NULL,
+                description TEXT,
+                category VARCHAR NOT NULL,
+                tags TEXT[] DEFAULT '{}',
+                voice_id VARCHAR NOT NULL,
+                base_voice_id VARCHAR,
+                settings JSONB NOT NULL,
+                sample_text TEXT,
+                sample_audio_url TEXT,
+                author_id VARCHAR NOT NULL,
+                author_name VARCHAR NOT NULL,
+                is_verified BOOLEAN DEFAULT false,
+                is_active BOOLEAN DEFAULT true,
+                downloads INTEGER DEFAULT 0,
+                upvotes INTEGER DEFAULT 0,
+                downvotes INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                moderation_status VARCHAR DEFAULT 'pending',
+                moderation_notes TEXT,
+                moderated_at TIMESTAMP,
+                moderated_by VARCHAR,
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'marketplace_personalities':
+            await client.query(`
+              CREATE TABLE marketplace_personalities (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                name VARCHAR NOT NULL,
+                description TEXT,
+                prompt TEXT NOT NULL,
+                category VARCHAR NOT NULL,
+                tags TEXT[] DEFAULT '{}',
+                author_id VARCHAR NOT NULL,
+                author_name VARCHAR NOT NULL,
+                is_verified BOOLEAN DEFAULT false,
+                is_active BOOLEAN DEFAULT true,
+                downloads INTEGER DEFAULT 0,
+                upvotes INTEGER DEFAULT 0,
+                downvotes INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                moderation_status VARCHAR DEFAULT 'pending',
+                moderation_notes TEXT,
+                moderated_at TIMESTAMP,
+                moderated_by VARCHAR,
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'user_downloads':
+            await client.query(`
+              CREATE TABLE user_downloads (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR NOT NULL,
+                item_type VARCHAR NOT NULL,
+                item_id VARCHAR NOT NULL,
+                downloaded_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'user_ratings':
+            await client.query(`
+              CREATE TABLE user_ratings (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR NOT NULL,
+                item_type VARCHAR NOT NULL,
+                item_id VARCHAR NOT NULL,
+                rating INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'content_reports':
+            await client.query(`
+              CREATE TABLE content_reports (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                reporter_id VARCHAR NOT NULL,
+                item_type VARCHAR NOT NULL,
+                item_id VARCHAR NOT NULL,
+                reason VARCHAR NOT NULL,
+                description TEXT,
+                status VARCHAR DEFAULT 'pending',
+                reviewed_at TIMESTAMP,
+                reviewed_by VARCHAR,
+                review_notes TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+            
+          case 'discord_settings':
+            await client.query(`
+              CREATE TABLE discord_settings (
+                id VARCHAR NOT NULL DEFAULT gen_random_uuid(),
+                user_id VARCHAR UNIQUE,
+                access_token TEXT,
+                refresh_token TEXT,
+                enabled_events JSONB DEFAULT '["chat"]',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                PRIMARY KEY (id)
+              )
+            `);
+            break;
+        }
+        
+        console.log(`✅ ${tableName} table created successfully`);
+      } else {
+        console.log(`✅ ${tableName} table already exists`);
+      }
     }
     
     console.log('✅ Sessions table configured');

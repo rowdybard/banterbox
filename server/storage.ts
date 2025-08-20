@@ -1,7 +1,7 @@
 import { type User, type InsertUser, type UpsertUser, type BanterItem, type InsertBanterItem, type UserSettings, type InsertUserSettings, type DailyStats, type InsertDailyStats, type TwitchSettings, type InsertTwitchSettings, type DiscordSettings, type InsertDiscordSettings, type LinkCode, type InsertLinkCode, type GuildLink, type InsertGuildLink, type GuildSettings, type InsertGuildSettings, type ContextMemory, type InsertContextMemory, type EventType, type EventData, type MarketplaceVoice, type InsertMarketplaceVoice, type MarketplacePersonality, type InsertMarketplacePersonality, type UserDownload, type InsertUserDownload, type UserRating, type InsertUserRating, type ContentReport, type InsertContentReport, users, banterItems, userSettings, dailyStats, twitchSettings, discordSettings, linkCodes, guildLinks, guildSettings, contextMemory, marketplaceVoices, marketplacePersonalities, userDownloads, userRatings, contentReports } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User methods (required for Local Auth)
@@ -1191,7 +1191,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(contextMemory.userId, userId),
-          sql`${contextMemory.expiresAt} > NOW()`
+          lt(new Date(), contextMemory.expiresAt)
         )
       )
       .orderBy(desc(contextMemory.createdAt))
@@ -1205,7 +1205,7 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(contextMemory.userId, userId),
             eq(contextMemory.guildId, guildId),
-            sql`${contextMemory.expiresAt} > NOW()`
+            lt(new Date(), contextMemory.expiresAt)
           )
         )
         .orderBy(desc(contextMemory.createdAt))
@@ -1223,7 +1223,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(contextMemory.userId, userId),
           eq(contextMemory.eventType, eventType),
-          sql`${contextMemory.expiresAt} > NOW()`
+          lt(new Date(), contextMemory.expiresAt)
         )
       )
       .orderBy(desc(contextMemory.createdAt))
@@ -1238,7 +1238,7 @@ export class DatabaseStorage implements IStorage {
             eq(contextMemory.userId, userId),
             eq(contextMemory.eventType, eventType),
             eq(contextMemory.guildId, guildId),
-            sql`${contextMemory.expiresAt} > NOW()`
+            lt(new Date(), contextMemory.expiresAt)
           )
         )
         .orderBy(desc(contextMemory.createdAt))
@@ -1258,7 +1258,7 @@ export class DatabaseStorage implements IStorage {
   async cleanExpiredContext(): Promise<number> {
     const result = await db
       .delete(contextMemory)
-      .where(sql`${contextMemory.expiresAt} < NOW()`);
+      .where(lt(contextMemory.expiresAt, new Date()));
     return result.rowCount || 0;
   }
 

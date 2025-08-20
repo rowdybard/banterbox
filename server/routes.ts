@@ -22,7 +22,7 @@ import TwitchEventSubClient from "./twitch";
 import { DiscordService } from "./discord";
 import OpenAI from "openai";
 import { elevenLabsService } from "./elevenlabs";
-import { FirebaseContextService } from "./firebaseContextService";
+
 
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR
@@ -2384,9 +2384,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/marketplace/personalities", async (req, res) => {
     try {
       const { category, sortBy, search, limit } = req.query;
-      const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
       
-      const personalities = await firebaseMarketplaceService.getPersonalities({
+      const personalities = await marketplaceService.getPersonalities({
         category: category as string,
         sortBy: sortBy as string,
         search: search as string,
@@ -2520,8 +2521,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If addToMarketplace is true, also save to marketplace
       if (addToMarketplace) {
         try {
-                  const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
-        const marketplacePersonality = await firebaseMarketplaceService.createPersonality({
+                        const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
+      const marketplacePersonality = await marketplaceService.createPersonality({
             name: name.trim(),
             description: description ? description.trim() : "",
             prompt: prompt.trim(),
@@ -2571,16 +2573,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { personalityId } = req.params;
       const userId = (req.user as any)?.id;
-      const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
       
       // Get the personality from marketplace
-      const personalityToDownload = await firebaseMarketplaceService.getPersonality(personalityId);
+      const personalityToDownload = await marketplaceService.getPersonality(personalityId);
       if (!personalityToDownload) {
         return res.status(404).json({ message: "Personality not found" });
       }
       
       // Check if user already downloaded
-      const alreadyDownloaded = await firebaseMarketplaceService.hasUserDownloaded(userId, 'personality', personalityId);
+      const alreadyDownloaded = await marketplaceService.hasUserDownloaded(userId, 'personality', personalityId);
       if (alreadyDownloaded) {
         return res.status(400).json({ 
           success: false,
@@ -2613,7 +2616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Track download
-      await firebaseMarketplaceService.downloadItem(userId, 'personality', personalityId);
+      await marketplaceService.downloadItem(userId, 'personality', personalityId);
       
       console.log(`Personality "${personalityToDownload.name}" downloaded by user ${userId}`);
       
@@ -2817,9 +2820,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/marketplace/voices", async (req, res) => {
     try {
       const { category, sortBy, search, limit } = req.query;
-      const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
       
-      const voices = await firebaseMarketplaceService.getVoices({
+      const voices = await marketplaceService.getVoices({
         category: category as string,
         sortBy: sortBy as string,
         search: search as string,
@@ -3008,16 +3012,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { voiceId } = req.params;
       const userId = (req.user as any)?.id;
-      const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
+      const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
       
       // Get the voice from marketplace
-      const voiceToDownload = await firebaseMarketplaceService.getVoice(voiceId);
+      const voiceToDownload = await marketplaceService.getVoice(voiceId);
       if (!voiceToDownload) {
         return res.status(404).json({ message: "Voice not found" });
       }
       
       // Check if user already downloaded
-      const alreadyDownloaded = await firebaseMarketplaceService.hasUserDownloaded(userId, 'voice', voiceId);
+      const alreadyDownloaded = await marketplaceService.hasUserDownloaded(userId, 'voice', voiceId);
       if (alreadyDownloaded) {
         return res.status(400).json({ 
           success: false,
@@ -3052,7 +3057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Track download
-      await firebaseMarketplaceService.downloadItem(userId, 'voice', voiceId);
+      await marketplaceService.downloadItem(userId, 'voice', voiceId);
       
       console.log(`Voice "${voiceToDownload.name}" downloaded by user ${userId}`);
       
@@ -3296,8 +3301,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If addToMarketplace is true, also save to marketplace
       if (addToMarketplace) {
         try {
-                  const { firebaseMarketplaceService } = await import('./firebaseMarketplace');
-        const marketplaceVoice = await firebaseMarketplaceService.createVoice({
+                        const { MarketplaceService } = await import('./marketplace');
+      const marketplaceService = new MarketplaceService();
+      const marketplaceVoice = await marketplaceService.createVoice({
             name: name.trim(),
             description: description ? description.trim() : "",
             category: category || "Custom",
