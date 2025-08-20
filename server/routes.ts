@@ -592,12 +592,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           
           console.log('Selected voice found:', selectedVoice);
+          console.log('Looking for voice ID:', selectedVoiceId);
+          console.log('Available voices:', favoriteVoices.map((v: any) => ({ id: v.id, name: v.name })));
           
           if (selectedVoice) {
             const voiceId = selectedVoice.baseVoiceId || selectedVoice.voiceId;
             console.log('Using voice ID for generation:', voiceId);
             // Pass the custom settings to the voice generation
             return await elevenLabsService.generateSpeech(enhancedText, voiceId, selectedVoice.settings);
+          } else {
+            console.log('❌ Voice not found! Available voices:', favoriteVoices.map((v: any) => v.id));
+            console.log('❌ This suggests the voice ID in settings does not match any voice in favorites');
+            console.log('❌ Settings voiceId:', selectedVoiceId);
+            console.log('❌ Favorite voice IDs:', favoriteVoices.map((v: any) => v.id));
           }
         }
         
