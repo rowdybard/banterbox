@@ -2936,77 +2936,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error checking all voices:', error);
       }
       
-      // Fallback to sample data if database is empty
-      if (!voices || voices.length === 0) {
-        const sampleVoices = [
-          {
-            id: "1",
-            name: "Gaming Warrior",
-            description: "Perfect for gaming streams with energetic commentary",
-            category: "Gaming",
-            tags: ["gaming", "energetic", "warrior"],
-            voiceId: "21m00Tcm4TlvDq8ikWAM",
-            baseVoiceId: "21m00Tcm4TlvDq8ikWAM",
-            settings: {
-              stability: 60,
-              similarityBoost: 80,
-              style: 20,
-              useSpeakerBoost: true
-            },
-            sampleText: "Welcome to the stream! Let's dominate this game!",
-            downloads: 850,
-            upvotes: 67,
-            downvotes: 2,
-            createdAt: "2024-01-15T10:00:00Z",
-            authorId: "user1"
+      // Combine database voices with sample voices for a better user experience
+      const sampleVoices = [
+        {
+          id: "sample-1",
+          name: "Gaming Warrior",
+          description: "Perfect for gaming streams with energetic commentary",
+          category: "Gaming",
+          tags: ["gaming", "energetic", "warrior"],
+          voiceId: "21m00Tcm4TlvDq8ikWAM",
+          baseVoiceId: "21m00Tcm4TlvDq8ikWAM",
+          settings: {
+            stability: 60,
+            similarityBoost: 80,
+            style: 20,
+            useSpeakerBoost: true
           },
-          {
-            id: "2",
-            name: "Chill Vibes",
-            description: "Relaxed and laid-back voice for casual streams",
-            category: "Entertainment",
-            tags: ["chill", "relaxed", "casual"],
-            voiceId: "ErXwobaYiN019PkySvjV",
-            baseVoiceId: "ErXwobaYiN019PkySvjV",
-            settings: {
-              stability: 75,
-              similarityBoost: 70,
-              style: 10,
-              useSpeakerBoost: false
-            },
-            sampleText: "Hey everyone, thanks for hanging out with us today.",
-            downloads: 1200,
-            upvotes: 89,
-            downvotes: 5,
-            createdAt: "2024-01-10T14:30:00Z",
-            authorId: "user2"
+          sampleText: "Welcome to the stream! Let's dominate this game!",
+          downloads: 850,
+          upvotes: 67,
+          downvotes: 2,
+          createdAt: "2024-01-15T10:00:00Z",
+          authorId: "banterbox-team",
+          authorName: "BanterBox Team",
+          isActive: true,
+          isVerified: true,
+          moderationStatus: "approved"
+        },
+        {
+          id: "sample-2",
+          name: "Chill Vibes",
+          description: "Relaxed and laid-back voice for casual streams",
+          category: "Entertainment",
+          tags: ["chill", "relaxed", "casual"],
+          voiceId: "ErXwobaYiN019PkySvjV",
+          baseVoiceId: "ErXwobaYiN019PkySvjV",
+          settings: {
+            stability: 75,
+            similarityBoost: 70,
+            style: 10,
+            useSpeakerBoost: false
           },
-          {
-            id: "3",
-            name: "Professional Narrator",
-            description: "Clear and professional voice for educational content",
-            category: "Education",
-            tags: ["professional", "clear", "educational"],
-            voiceId: "JBFqnCBsd6RMkjVDRZzb",
-            baseVoiceId: "JBFqnCBsd6RMkjVDRZzb",
-            settings: {
-              stability: 85,
-              similarityBoost: 90,
-              style: 5,
-              useSpeakerBoost: true
-            },
-            sampleText: "Today we'll be exploring the fascinating world of science.",
-            downloads: 650,
-            upvotes: 45,
-            downvotes: 1,
-            createdAt: "2024-01-20T09:15:00Z",
-            authorId: "user3"
-          }
-        ];
-        return res.json(sampleVoices);
-      }
+          sampleText: "Hey everyone, thanks for hanging out with us today.",
+          downloads: 1200,
+          upvotes: 89,
+          downvotes: 5,
+          createdAt: "2024-01-10T14:30:00Z",
+          authorId: "banterbox-team",
+          authorName: "BanterBox Team",
+          isActive: true,
+          isVerified: true,
+          moderationStatus: "approved"
+        },
+        {
+          id: "sample-3",
+          name: "Professional Narrator",
+          description: "Clear and professional voice for educational content",
+          category: "Education",
+          tags: ["professional", "clear", "educational"],
+          voiceId: "JBFqnCBsd6RMkjVDRZzb",
+          baseVoiceId: "JBFqnCBsd6RMkjVDRZzb",
+          settings: {
+            stability: 85,
+            similarityBoost: 90,
+            style: 5,
+            useSpeakerBoost: true
+          },
+          sampleText: "Today we'll be exploring the fascinating world of science.",
+          downloads: 650,
+          upvotes: 45,
+          downvotes: 1,
+          createdAt: "2024-01-20T09:15:00Z",
+          authorId: "banterbox-team",
+          authorName: "BanterBox Team",
+          isActive: true,
+          isVerified: true,
+          moderationStatus: "approved"
+        }
+      ];
 
-      res.json(voices);
+      // Combine database voices with sample voices
+      const allVoices = [...(voices || []), ...sampleVoices];
+      
+      console.log('Combined voices result:', {
+        databaseVoices: voices?.length || 0,
+        sampleVoices: sampleVoices.length,
+        totalVoices: allVoices.length
+      });
+
+      res.json(allVoices);
     } catch (error) {
       console.error('Error getting marketplace voices:', error);
       res.status(500).json({ message: "Failed to get marketplace voices" });
