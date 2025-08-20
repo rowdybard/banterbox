@@ -56,6 +56,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   // Voice Settings State
   const [voiceProvider, setVoiceProvider] = useState(settings?.voiceProvider || 'openai');
   const [voiceId, setVoiceId] = useState(settings?.voiceId || '');
+  const [voiceType, setVoiceType] = useState<'base' | 'favorite' | null>(null); // Track which type is selected
   const [volume, setVolume] = useState(settings?.volume || 75);
   const [autoPlay, setAutoPlay] = useState(settings?.autoPlay ?? true);
   const [hasUnsavedVoiceChanges, setHasUnsavedVoiceChanges] = useState(false);
@@ -90,6 +91,8 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       
       // Handle voice ID - check if it's a favorite voice
       let initialVoiceId = settings.voiceId || '';
+      let initialVoiceType: 'base' | 'favorite' | null = null;
+      
       if (initialVoiceId && favoriteVoices?.voices) {
         // Check if this voiceId matches any favorite voice's actual voice ID
         const matchingFavorite = favoriteVoices.voices.find((v: any) => 
@@ -98,10 +101,15 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
         if (matchingFavorite) {
           // Use the favorite voice's unique ID for the select component
           initialVoiceId = matchingFavorite.id;
+          initialVoiceType = 'favorite';
           console.log(`Found matching favorite voice: ${matchingFavorite.name}, using ID: ${initialVoiceId}`);
+        } else if (Array.isArray(elevenLabsVoices) && elevenLabsVoices.some((v: any) => v.id === initialVoiceId)) {
+          // It's a base voice
+          initialVoiceType = 'base';
         }
       }
       setVoiceId(initialVoiceId);
+      setVoiceType(initialVoiceType);
       
       setVolume(settings.volume || 75);
       setAutoPlay(settings.autoPlay ?? true);
@@ -136,6 +144,26 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   console.log('Favorite voices data:', favoriteVoices);
   console.log('Current voiceId:', voiceId);
   console.log('Current voiceProvider:', voiceProvider);
+  
+  // Determine which type of voice is currently selected
+  const isBaseVoice = voiceId && Array.isArray(elevenLabsVoices) && elevenLabsVoices.some((v: any) => v.id === voiceId);
+  const isFavoriteVoice = voiceId && favoriteVoices?.voices && favoriteVoices.voices.some((v: any) => v.id === voiceId);
+
+  // Debug current voice selection
+  if (voiceId && favoriteVoices?.voices) {
+    const selectedVoice = favoriteVoices.voices.find((v: any) => v.id === voiceId);
+    if (selectedVoice) {
+      console.log('Selected favorite voice:', {
+        name: selectedVoice.name,
+        id: selectedVoice.id,
+        baseVoiceId: selectedVoice.baseVoiceId,
+        voiceId: selectedVoice.voiceId,
+        actualVoiceId: selectedVoice.baseVoiceId || selectedVoice.voiceId
+      });
+    } else {
+      console.log('Selected regular ElevenLabs voice ID:', voiceId);
+    }
+  }
 
   // Update settings mutation
   const updateSettingsMutation = useMutation({
@@ -272,27 +300,13 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     }
   };
 
-  const handleVoiceIdChange = (id: string) => {
-    console.log('Voice ID changed to:', id);
+  const handleVoiceIdChange = (id: string, type: 'base' | 'favorite') => {
+    console.log(`Voice ID changed to: ${id} (type: ${type})`);
     console.log('Previous voice ID was:', voiceId);
-    console.log('Available voices:', (favoriteVoices as any)?.voices?.map((v: any) => ({ 
-      id: v.id, 
-      name: v.name, 
-      baseVoiceId: v.baseVoiceId, 
-      voiceId: v.voiceId,
-      calculatedValue: v.baseVoiceId || v.voiceId
-    })));
     
-    // For favorite voices, we need to get the actual voice ID to use
-    if ((favoriteVoices as any)?.voices?.some((v: any) => v.id === id)) {
-      const favoriteVoice = (favoriteVoices as any).voices.find((v: any) => v.id === id);
-      const actualVoiceId = favoriteVoice.baseVoiceId || favoriteVoice.voiceId;
-      console.log(`Favorite voice selected: ${favoriteVoice.name}, using actual voice ID: ${actualVoiceId}`);
-      setVoiceId(actualVoiceId);
-    } else {
-      // Regular ElevenLabs voice
-      setVoiceId(id);
-    }
+    // Clear the other voice type selection
+    setVoiceId(id);
+    setVoiceType(type);
     setHasUnsavedVoiceChanges(true);
   };
 
@@ -323,7 +337,16 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   // Test current voice
   const handleTestVoice = () => {
     if (voiceProvider === 'elevenlabs' && voiceId) {
-      testVoiceMutation.mutate({ voiceId });
+      // Get the actual voice ID based on the voice type
+      let actualVoiceId = voiceId;
+      if (voiceType === 'favorite' && favoriteVoices?.voices) {
+        const favoriteVoice = favoriteVoices.voices.find((v: any) => v.id === voiceId);
+        if (favoriteVoice) {
+          actualVoiceId = favoriteVoice.baseVoiceId || favoriteVoice.voiceId;
+          console.log(`Testing favorite voice: ${favoriteVoice.name}, actual voice ID: ${actualVoiceId}`);
+        }
+      }
+      testVoiceMutation.mutate({ voiceId: actualVoiceId });
     } else {
       toast({
         title: "No voice to test",
@@ -382,9 +405,19 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
   // Save handlers
   const handleSaveVoiceSettings = () => {
+    // Get the actual voice ID based on the voice type
+    let actualVoiceId = voiceId;
+    if (voiceType === 'favorite' && favoriteVoices?.voices) {
+      const favoriteVoice = favoriteVoices.voices.find((v: any) => v.id === voiceId);
+      if (favoriteVoice) {
+        actualVoiceId = favoriteVoice.baseVoiceId || favoriteVoice.voiceId;
+        console.log(`Saving favorite voice: ${favoriteVoice.name}, actual voice ID: ${actualVoiceId}`);
+      }
+    }
+
     const updates: Partial<UserSettings> = {
       voiceProvider,
-      voiceId: (voiceProvider === 'elevenlabs' || voiceProvider === 'favorite') ? voiceId : undefined,
+      voiceId: (voiceProvider === 'elevenlabs') ? actualVoiceId : undefined,
       volume,
       autoPlay,
     };
@@ -460,46 +493,57 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
           {/* ElevenLabs Voice Selection */}
           {voiceProvider === 'elevenlabs' && (user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'byok' || user?.subscriptionTier === 'enterprise') && (
-            <div>
-              <Label className="text-sm font-medium text-gray-300 mb-2 block">
-                ElevenLabs Voice
-              </Label>
-              <Select 
-                value={voiceId}
-                onValueChange={handleVoiceIdChange}
-                data-testid="select-elevenlabs-voice"
-              >
-                <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
-                  <SelectValue placeholder="Select a voice..." />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {/* Available ElevenLabs Voices */}
-                  {(Array.isArray(elevenLabsVoices) ? elevenLabsVoices : [])?.map((voice: any) => (
-                    <SelectItem key={voice.id} value={voice.id}>
-                      {voice.name} - {voice.description}
-                    </SelectItem>
-                  ))}
-                  
-                  {/* Favorite Voices */}
-                  {(favoriteVoices as any)?.voices?.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-medium text-gray-400 border-b border-gray-600 mt-2">
-                        Saved Voices
-                      </div>
-                      <div className="max-h-32 overflow-y-auto">
-                        {(favoriteVoices as any).voices.map((voice: any) => (
-                          <SelectItem key={voice.id} value={voice.id}>
-                            <div className="flex items-center space-x-2">
-                              <Star className="h-3 w-3 text-yellow-400" />
-                              <span>{voice.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              {/* Base ElevenLabs Voices */}
+              <div>
+                <Label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Base ElevenLabs Voices
+                </Label>
+                <Select 
+                  value={isBaseVoice ? voiceId : ''}
+                  onValueChange={(id) => handleVoiceIdChange(id, 'base')}
+                  data-testid="select-base-voice"
+                >
+                  <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Select a base voice..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {(Array.isArray(elevenLabsVoices) ? elevenLabsVoices : [])?.map((voice: any) => (
+                      <SelectItem key={voice.id} value={voice.id}>
+                        {voice.name} - {voice.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Favorite Voices */}
+              {(favoriteVoices as any)?.voices?.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-300 mb-2 block">
+                    Saved Favorite Voices
+                  </Label>
+                  <Select 
+                    value={isFavoriteVoice ? voiceId : ''}
+                    onValueChange={(id) => handleVoiceIdChange(id, 'favorite')}
+                    data-testid="select-favorite-voice"
+                  >
+                    <SelectTrigger className="w-full bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Select a saved voice..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      {(favoriteVoices as any).voices.map((voice: any) => (
+                        <SelectItem key={voice.id} value={voice.id}>
+                          <div className="flex items-center space-x-2">
+                            <Star className="h-3 w-3 text-yellow-400" />
+                            <span>{voice.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
 
