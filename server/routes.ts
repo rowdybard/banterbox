@@ -1809,6 +1809,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test voice simulation endpoint
+  app.post("/api/test-voice-simulation", isAuthenticated, async (req, res) => {
+    try {
+      const { message, guildId } = req.body;
+      const userId = (req.user as any)?.id;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      console.log(`🎤 Testing voice simulation: message="${message}" for user: ${userId}`);
+      
+      const VoiceService = (await import('./voiceService')).VoiceService;
+      const voiceService = VoiceService.getInstance();
+      
+      await voiceService.simulateVoiceActivity(userId, guildId || 'test-guild', message);
+      
+      res.json({
+        success: true,
+        message: 'Voice activity simulated successfully',
+        simulatedMessage: message,
+        userId: userId
+      });
+    } catch (error) {
+      console.error('Voice simulation test error:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Test intelligent detection system with OpenAI analysis
   app.post("/api/test-intelligent-detection", isAuthenticated, async (req, res) => {
     try {

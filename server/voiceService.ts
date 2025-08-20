@@ -136,6 +136,40 @@ export class VoiceService {
   }
 
   /**
+   * Simulate voice activity for testing (since we don't have actual audio yet)
+   */
+  public async simulateVoiceActivity(userId: string, guildId: string, message: string): Promise<void> {
+    try {
+      console.log(`🎤 Simulating voice activity: "${message}"`);
+      
+      // Check for wake word
+      if (message.toLowerCase().includes('hey banter')) {
+        this.wakeWordDetected = true;
+        this.transcriptionBuffer = '';
+        console.log('🔔 Wake word detected!');
+        
+        // Store the wake word interaction
+        await this.storeVoiceContext(message, userId, guildId, true);
+      } else if (this.wakeWordDetected) {
+        // Continue collecting speech after wake word
+        this.transcriptionBuffer += ' ' + message;
+        
+        // If we have enough speech or detect end of sentence, process it
+        if (message.includes('.') || message.includes('?') || message.includes('!')) {
+          await this.storeVoiceContext(this.transcriptionBuffer.trim(), userId, guildId, false);
+          this.wakeWordDetected = false;
+          this.transcriptionBuffer = '';
+        }
+      } else {
+        // Store regular conversation context (without wake word)
+        await this.storeVoiceContext(message, userId, guildId, false);
+      }
+    } catch (error) {
+      console.error('❌ Error simulating voice activity:', error);
+    }
+  }
+
+  /**
    * Transcribe audio using OpenAI Whisper
    */
   private async transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
