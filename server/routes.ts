@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { ObjectStorageService } from "./objectStorage";
 import { firebaseStorage } from "./firebase";
-import { insertBanterItemSchema, insertUserSettingsSchema, type EventType, type EventData, guildLinks, linkCodes, discordSettings, users } from "@shared/schema";
+import { insertBanterItemSchema, insertUserSettingsSchema, type EventType, type EventData, guildLinks, linkCodes, discordSettings, users, marketplaceVoices } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { getTierConfig } from "@shared/billing";
@@ -2880,8 +2880,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/marketplace/voices", async (req, res) => {
     try {
       const { category, sortBy, search, limit } = req.query;
+      
+      // Check if database is available
+      if (!db) {
+        console.error('Database not available for marketplace voices query');
+        return res.status(503).json({ message: "Database not available" });
+      }
+      
       const { MarketplaceService } = await import('./marketplace');
       const marketplaceService = new MarketplaceService();
+      
+      console.log('Querying marketplace voices with filters:', { category, sortBy, search, limit }); // Debug log
       
       const voices = await marketplaceService.getVoices({
         category: category as string,
@@ -2895,6 +2904,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: voices?.length || 0,
         voices: voices?.map(v => ({ id: v.id, name: v.name, isActive: v.isActive, moderationStatus: v.moderationStatus }))
       });
+      
+      // Debug: Check all voices in database (including non-approved ones)
+      try {
+        const allVoices = await marketplaceService.getVoices({ onlyApproved: false });
+        console.log('All voices in database (including non-approved):', {
+          count: allVoices?.length || 0,
+          voices: allVoices?.map(v => ({ 
+            id: v.id, 
+            name: v.name, 
+            isActive: v.isActive, 
+            moderationStatus: v.moderationStatus,
+            authorId: v.authorId
+          }))
+        });
+        
+        // Direct database query to see what's actually in the table
+        const directQuery = await db.select().from(marketplaceVoices);
+        console.log('Direct database query result:', {
+          count: directQuery?.length || 0,
+          voices: directQuery?.map(v => ({ 
+            id: v.id, 
+            name: v.name, 
+            isActive: v.isActive, 
+            moderationStatus: v.moderationStatus,
+            authorId: v.authorId,
+            createdAt: v.createdAt
+          }))
+        });
+      } catch (error) {
+        console.error('Error checking all voices:', error);
+      }
       
       // Fallback to sample data if database is empty
       if (!voices || voices.length === 0) {
@@ -3361,9 +3401,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If addToMarketplace is true, also save to marketplace
       if (addToMarketplace) {
         try {
-                        const { MarketplaceService } = await import('./marketplace');
-      const marketplaceService = new MarketplaceService();
-      const marketplaceVoice = await marketplaceService.createVoice({
+          console.log('Attempting to save voice to marketplace...'); // Debug log
+          
+          // Check if database is available
+          if (!db) {
+            console.error('Database not available for marketplace save');
+            throw new Error('Database connection not available');
+          }
+          
+          const { MarketplaceService } = await import('./marketplace');
+          const marketplaceService = new MarketplaceService();
+          
+          const marketplaceVoiceData = {
             name: name.trim(),
             description: description ? description.trim() : "",
             category: category || "Custom",
@@ -3380,10 +3429,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             upvotes: 0,
             downvotes: 0,
             moderationStatus: 'approved' // Auto-approve all marketplace uploads
-          });
-          console.log('Voice submitted to marketplace:', marketplaceVoice.id);
+          };
+          
+          console.log('Marketplace voice data:', marketplaceVoiceData); // Debug log
+          
+          const marketplaceVoice = await marketplaceService.createVoice(marketplaceVoiceData);
+          console.log('✅ Voice submitted to marketplace successfully:', marketplaceVoice.id);
         } catch (error) {
-          console.error('Failed to submit voice to marketplace:', error);
+          console.error('❌ Failed to submit voice to marketplace:', error);
+          console.error('Error details:', {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          });
           // Don't fail the whole operation if marketplace submission fails
         }
       }
