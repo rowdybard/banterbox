@@ -168,20 +168,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const personality = settings?.banterPersonality || 'context';
           const customPrompt = settings?.customPersonalityPrompt;
 
-          if (personality === 'custom' && customPrompt) {
-            // Enhance short custom prompts to be more descriptive
-            if (customPrompt.length < 50) {
-              // If it's a short prompt like "college bro", expand it
-              if (customPrompt.toLowerCase().includes('college bro') || customPrompt.toLowerCase().includes('gig economy')) {
-                personalityContext = "You're a typical college bro who's knowledgeable about the gig economy. Be casual, confident, and use modern slang. Talk about side hustles, delivery apps, freelancing, and student life. Keep responses under 25 words. Be energetic and relatable to young people. Use phrases like 'bro', 'dude', 'that's fire', 'no cap', etc. naturally.";
-                console.log(`DEBUG: Enhanced short custom prompt for user ${userId}`);
-              } else {
-                personalityContext = customPrompt;
-                console.log(`DEBUG: Using custom personality prompt for user ${userId}`);
-              }
+          if (personality === 'custom') {
+            if (customPrompt && customPrompt.trim()) {
+              // Use the custom prompt as-is
+              personalityContext = customPrompt.trim();
+              console.log(`DEBUG: Using custom personality prompt for user ${userId}: "${customPrompt.substring(0, 100)}..."`);
             } else {
-              personalityContext = customPrompt;
-              console.log(`DEBUG: Using custom personality prompt for user ${userId}`);
+              // If custom personality is selected but no prompt is provided, use a default
+              personalityContext = "Be conversational and natural. Keep responses under 25 words. Be creative and varied in your responses.";
+              console.log(`DEBUG: Custom personality selected but no prompt provided, using default for user ${userId}`);
             }
           } else if (personality.startsWith('favorite_') && customPrompt) {
             // Use custom prompt for favorite personalities
@@ -1719,6 +1714,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting favorite voice:', error);
       res.status(500).json({ message: "Failed to delete voice" });
+    }
+  });
+
+  // Test personality system
+  app.post("/api/test-personality-system", isAuthenticated, async (req, res) => {
+    try {
+      const { message, personality, customPrompt } = req.body;
+      const userId = (req.user as any)?.id;
+      
+      console.log(`🧪 Testing personality system: personality="${personality}", customPrompt="${customPrompt}" for user: ${userId}`);
+      
+      // Temporarily update user settings for testing
+      if (personality || customPrompt) {
+        const updates: any = {};
+        if (personality) updates.banterPersonality = personality;
+        if (customPrompt) updates.customPersonalityPrompt = customPrompt;
+        
+        await storage.updateUserSettings(userId, updates);
+        console.log(`Updated user settings for testing:`, updates);
+      }
+      
+      // Get current settings
+      const settings = await storage.getUserSettings(userId);
+      
+      // Test banter generation
+      const testMessage = message || "Hey banterbox, test the personality!";
+      const eventData = {
+        displayName: "TestUser",
+        messageContent: testMessage
+      };
+      
+      const banterResponse = await generateBanter(
+        'chat',
+        eventData,
+        testMessage,
+        userId
+      );
+      
+      res.json({
+        success: true,
+        testMessage,
+        banterResponse,
+        appliedPersonality: settings?.banterPersonality || 'default',
+        customPrompt: settings?.customPersonalityPrompt || 'none',
+        userId,
+        settings: settings
+      });
+    } catch (error) {
+      console.error('Personality system test error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

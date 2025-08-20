@@ -81,7 +81,22 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
     if (settings) {
       // Voice settings
       setVoiceProvider(settings.voiceProvider || 'openai');
-      setVoiceId(settings.voiceId || '');
+      
+      // Handle voice ID - check if it's a favorite voice
+      let initialVoiceId = settings.voiceId || '';
+      if (initialVoiceId && favoriteVoices?.voices) {
+        // Check if this voiceId matches any favorite voice's actual voice ID
+        const matchingFavorite = favoriteVoices.voices.find((v: any) => 
+          (v.baseVoiceId || v.voiceId) === initialVoiceId
+        );
+        if (matchingFavorite) {
+          // Use the favorite voice's unique ID for the select component
+          initialVoiceId = matchingFavorite.id;
+          console.log(`Found matching favorite voice: ${matchingFavorite.name}, using ID: ${initialVoiceId}`);
+        }
+      }
+      setVoiceId(initialVoiceId);
+      
       setVolume(settings.volume || 75);
       setAutoPlay(settings.autoPlay ?? true);
       setHasUnsavedVoiceChanges(false);
@@ -95,7 +110,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setCustomPrompt(settings.customPersonalityPrompt || '');
       setHasUnsavedPersonalityChanges(false);
     }
-  }, [settings]);
+  }, [settings, favoriteVoices]);
 
   // Fetch ElevenLabs voices for Pro users
   const { data: elevenLabsVoices } = useQuery({
@@ -268,7 +283,17 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       voiceId: v.voiceId,
       calculatedValue: v.baseVoiceId || v.voiceId
     })));
-    setVoiceId(id);
+    
+    // For favorite voices, we need to get the actual voice ID to use
+    if ((favoriteVoices as any)?.voices?.some((v: any) => v.id === id)) {
+      const favoriteVoice = (favoriteVoices as any).voices.find((v: any) => v.id === id);
+      const actualVoiceId = favoriteVoice.baseVoiceId || favoriteVoice.voiceId;
+      console.log(`Favorite voice selected: ${favoriteVoice.name}, using actual voice ID: ${actualVoiceId}`);
+      setVoiceId(actualVoiceId);
+    } else {
+      // Regular ElevenLabs voice
+      setVoiceId(id);
+    }
     setHasUnsavedVoiceChanges(true);
   };
 
@@ -464,7 +489,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                       </div>
                       <div className="max-h-32 overflow-y-auto">
                         {(favoriteVoices as any).voices.map((voice: any) => (
-                          <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
+                          <SelectItem key={voice.id} value={voice.id}>
                             <div className="flex items-center space-x-2">
                               <Star className="h-3 w-3 text-yellow-400" />
                               <span>{voice.name}</span>
