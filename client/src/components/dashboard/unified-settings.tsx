@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAudio } from "@/hooks/use-audio";
 import { Save, Brain, Plus, Star, Crown, Mic, Play, Volume2, RefreshCw } from "lucide-react";
 import type { UserSettings, User } from "@shared/schema";
-import { isProUser } from "@shared/subscription";
 
 const personalityPresets = {
   witty: {
@@ -76,6 +75,13 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   const [newPersonalityPrompt, setNewPersonalityPrompt] = useState('');
   const [newPersonalityDescription, setNewPersonalityDescription] = useState('');
 
+  // Fetch favorite voices first (before useEffect)
+  const { data: favoriteVoices } = useQuery({
+    queryKey: ['/api/favorites/voices'],
+    enabled: true,
+    retry: false,
+  });
+
   // Update local state when settings change
   useEffect(() => {
     if (settings) {
@@ -122,13 +128,6 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
   // Fetch favorite personalities
   const { data: favoritePersonalities } = useQuery({
     queryKey: ['/api/favorites/personalities'],
-    enabled: true,
-    retry: false,
-  });
-
-  // Fetch favorite voices
-  const { data: favoriteVoices } = useQuery({
-    queryKey: ['/api/favorites/voices'],
     enabled: true,
     retry: false,
   });
