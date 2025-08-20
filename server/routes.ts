@@ -76,15 +76,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     clients.add(ws);
     console.log('Client connected to WebSocket');
     
-    ws.on('close', () => {
+    // Send initial connection confirmation
+    try {
+      ws.send(JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() }));
+    } catch (error) {
+      console.error('Failed to send initial message:', error);
+    }
+    
+    ws.on('close', (code, reason) => {
       clients.delete(ws);
-      console.log('Client disconnected from WebSocket');
+      console.log(`Client disconnected from WebSocket: ${code} ${reason}`);
     });
     
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       clients.delete(ws);
     });
+    
+    // Handle incoming messages
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log('Received WebSocket message:', message);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    });
+  });
+  
+  // Handle WebSocket server errors
+  wss.on('error', (error) => {
+    console.error('WebSocket server error:', error);
   });
   
   // Broadcast to all connected clients

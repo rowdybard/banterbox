@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export function useWebSocket(onMessage?: (data: any) => void) {
   const [lastMessage, setLastMessage] = useState<any>(null);
@@ -8,15 +8,22 @@ export function useWebSocket(onMessage?: (data: any) => void) {
   const lastMessageRef = useRef<any>(null);
   const onMessageRef = useRef(onMessage);
 
-  const connect = () => {
+  const connect = useCallback(() => {
+    // Don't create a new connection if one already exists
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log("WebSocket already connected, skipping...");
+      return;
+    }
+
     try {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws`;
       
+      console.log("Creating new WebSocket connection to:", wsUrl);
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
-        console.log("WebSocket connected");
+        console.log("WebSocket connected successfully");
         setIsConnected(true);
         // Restore last message after reconnection
         if (lastMessageRef.current) {
@@ -44,14 +51,18 @@ export function useWebSocket(onMessage?: (data: any) => void) {
         }
       };
       
-      wsRef.current.onclose = () => {
-        console.log("WebSocket disconnected");
+      wsRef.current.onclose = (event) => {
+        console.log("WebSocket disconnected:", event.code, event.reason);
         setIsConnected(false);
-        // Attempt to reconnect after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log("Attempting to reconnect WebSocket...");
-          connect();
-        }, 3000);
+        
+        // Only reconnect if it wasn't a deliberate close
+        if (event.code !== 1000 && event.code !== 1001) {
+          // Attempt to reconnect after 3 seconds
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log("Attempting to reconnect WebSocket...");
+            connect();
+          }, 3000);
+        }
       };
       
       wsRef.current.onerror = (error) => {
@@ -66,7 +77,7 @@ export function useWebSocket(onMessage?: (data: any) => void) {
         connect();
       }, 5000);
     }
-  };
+  }, []); // Empty dependency array to prevent recreation
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -76,12 +87,13 @@ export function useWebSocket(onMessage?: (data: any) => void) {
     connect();
     
     return () => {
+      console.log("Cleaning up WebSocket connection...");
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
       if (wsRef.current) {
-        wsRef.current.close();
+        wsRef.current.close(1000, "Component unmounting");
         wsRef.current = null;
       }
     };
