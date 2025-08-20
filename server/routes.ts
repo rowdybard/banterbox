@@ -534,6 +534,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getUserSettings(userId);
       const voiceProvider = settings?.voiceProvider || 'openai';
       
+      console.log('TTS Generation Debug:', {
+        userId,
+        voiceProvider,
+        voiceId: settings?.voiceId,
+        favoriteVoices: settings?.favoriteVoices ? 'Has favorite voices' : 'No favorite voices',
+        settings: settings
+      });
+      
       // Apply pronunciation hints to the text if original message is provided
       let enhancedText = text;
       if (originalMessage) {
@@ -977,10 +985,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
+      console.log(`DEBUG: Updating settings for user ${userId}:`, updates);
+      
       let updated = await storage.updateUserSettings(userId, updates);
       
       // If settings don't exist, create them first
       if (!updated) {
+        console.log(`DEBUG: Creating new settings for user ${userId}`);
         const newSettings = await storage.createUserSettings({
           userId,
           voiceProvider: updates.voiceProvider || 'openai',
@@ -1008,7 +1019,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         banterPersonality: updated?.banterPersonality,
         customPersonalityPrompt: updated?.customPersonalityPrompt ? 'Has custom prompt' : 'No custom prompt',
         voiceProvider: updated?.voiceProvider,
-        voiceId: updated?.voiceId
+        voiceId: updated?.voiceId,
+        favoriteVoices: updated?.favoriteVoices ? `Has ${Array.isArray(updated.favoriteVoices) ? updated.favoriteVoices.length : 'some'} favorite voices` : 'No favorite voices'
       });
       
       res.json(updated);
@@ -1724,6 +1736,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
+  // Test voice settings
+  app.post("/api/test/voice-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      console.log(`🧪 Testing voice settings for user: ${userId}`);
+      
+      // Get current settings
+      const settings = await storage.getUserSettings(userId);
+      console.log('Current settings:', settings);
+      
+      // Test TTS generation with current settings
+      const testText = "This is a test of the current voice settings.";
+      const audioBuffer = await generateTTS(testText, userId);
+      
+      res.json({
+        success: true,
+        settings,
+        hasAudio: !!audioBuffer,
+        audioSize: audioBuffer ? audioBuffer.length : 0,
+        voiceProvider: settings?.voiceProvider,
+        voiceId: settings?.voiceId,
+        favoriteVoices: settings?.favoriteVoices ? `Has ${Array.isArray(settings.favoriteVoices) ? settings.favoriteVoices.length : 'some'} voices` : 'None'
+      });
+    } catch (error) {
+      console.error('Voice settings test error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
