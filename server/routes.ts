@@ -4220,6 +4220,11 @@ function applyResponseFrequencyFilter(responseFrequency: number, responseReason:
     return true;
   }
 
+  // Always respond to keyword triggers if frequency is 25% or higher
+  if (responseReason === 'keyword trigger' && responseFrequency >= 25) {
+    return true;
+  }
+
   // Generate a random number between 0 and 100
   const randomValue = Math.random() * 100;
   

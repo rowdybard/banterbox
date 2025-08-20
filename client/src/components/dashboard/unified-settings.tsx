@@ -609,8 +609,8 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
               <span>More Responsive</span>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              {responseFrequency <= 25 && "Very selective - only responds to direct mentions and important questions"}
-              {responseFrequency > 25 && responseFrequency <= 50 && "Moderate - responds to trigger words and direct questions"}
+              {responseFrequency <= 25 && "Very selective - only responds to direct mentions and keyword triggers"}
+              {responseFrequency > 25 && responseFrequency <= 50 && "Moderate - responds to keyword triggers and some direct questions"}
               {responseFrequency > 50 && responseFrequency <= 75 && "Responsive - responds to most interactions and conversations"}
               {responseFrequency > 75 && "Very responsive - responds to almost all interactions"}
             </p>
