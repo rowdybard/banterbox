@@ -22,6 +22,15 @@ export function useWebSocket(onMessage?: (data: any) => void) {
       console.log("Creating new WebSocket connection to:", wsUrl);
       wsRef.current = new WebSocket(wsUrl);
       
+      // Start ping interval to keep connection alive
+      const pingInterval = setInterval(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
+        } else {
+          clearInterval(pingInterval);
+        }
+      }, 30000); // Ping every 30 seconds
+      
       wsRef.current.onopen = () => {
         console.log("WebSocket connected successfully");
         setIsConnected(true);

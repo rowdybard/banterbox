@@ -2,6 +2,18 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('🚨 UNCAUGHT EXCEPTION:', error);
+  console.error('Stack trace:', error.stack);
+  // Don't exit immediately, let the server try to continue
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🚨 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+  // Don't exit immediately, let the server try to continue
+});
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

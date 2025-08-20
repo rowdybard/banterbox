@@ -93,15 +93,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       clients.delete(ws);
     });
     
-    // Handle incoming messages
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        console.log('Received WebSocket message:', message);
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+      // Handle incoming messages
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      console.log('Received WebSocket message:', message);
+      
+      // Handle ping/pong for connection health
+      if (message.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
       }
-    });
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  });
   });
   
   // Handle WebSocket server errors
@@ -117,11 +122,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Use Array.from() to avoid modifying Set during iteration
     const clientsToRemove: WebSocket[] = [];
     Array.from(clients).forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-        console.log('Message sent to client');
-      } else {
-        console.log('Client not ready, marking for removal');
+      try {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+          console.log('Message sent to client');
+        } else {
+          console.log('Client not ready, marking for removal');
+          clientsToRemove.push(client);
+        }
+      } catch (error) {
+        console.error('Error sending message to client:', error);
         clientsToRemove.push(client);
       }
     });
@@ -129,6 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Remove closed clients after iteration
     clientsToRemove.forEach(client => {
       clients.delete(client);
+      console.log(`Removed disconnected client. Total clients: ${clients.size}`);
     });
   }
 
