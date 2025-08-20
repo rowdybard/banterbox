@@ -1,6 +1,6 @@
 import { db } from './db.js';
 import { contextMemory } from '@shared/schema.js';
-import { eq, and, desc, lt, or, isNull } from 'drizzle-orm';
+import { eq, and, desc, lt, or, isNull, sql } from 'drizzle-orm';
 import type { EventType, EventData } from '@shared/schema.js';
 
 /**
@@ -95,7 +95,7 @@ export class PostgresContextService {
         .where(
           and(
             eq(contextMemory.userId, userId),
-            lt(new Date(), contextMemory.expiresAt) // Fixed: get records that haven't expired yet
+            lt(sql`NOW()`, contextMemory.expiresAt) // Fixed: get records that haven't expired yet
           )
         )
         .orderBy(desc(contextMemory.createdAt))
@@ -106,13 +106,9 @@ export class PostgresContextService {
       // Smart Context Logic - Use OpenAI to determine if context is needed
       let shouldUseContext = true;
       
-      if (currentMessage && processedContext.length > 0) {
-        // Use OpenAI to analyze if this message needs context
-        shouldUseContext = await this.shouldUseContextWithAI(currentMessage, processedContext);
-      } else {
-        // Fallback to rule-based logic
-        shouldUseContext = this.shouldUseContextForEvent(currentEventType, processedContext.length);
-      }
+      // TEMPORARILY: Always use context if we have any to ensure it's working
+      shouldUseContext = processedContext.length > 0;
+      console.log(`🔍 TEMPORARY - Always use context if available: ${shouldUseContext} (${processedContext.length} context items)`);
       
       if (!shouldUseContext) {
         return '';
