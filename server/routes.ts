@@ -2734,6 +2734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { VoiceService } = await import('./voiceService');
       const voiceService = VoiceService.getInstance();
       voiceService.setDiscordService(globalDiscordService);
+      globalDiscordService.setVoiceService(voiceService);
       console.log('✅ Voice service initialized and connected to Discord service');
     } catch (error) {
       console.error('❌ Failed to initialize voice service:', error);

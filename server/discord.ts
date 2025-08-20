@@ -87,6 +87,9 @@ export class DiscordService {
   private readonly GUILD_VALIDATION_INTERVAL = 300000; // 5 minutes
   private guildValidationInterval?: NodeJS.Timeout;
   
+  // Voice service integration
+  private voiceService: any = null;
+  
   constructor(config: DiscordConfig) {
     this.config = config;
     this.client = new Client({
@@ -474,6 +477,14 @@ export class DiscordService {
 
   setBanterCallback(callback: (userId: string, originalMessage: string, eventType: string, eventData: any) => Promise<void>) {
     this.banterCallback = callback;
+  }
+
+  /**
+   * Sets the voice service reference
+   */
+  setVoiceService(voiceService: any) {
+    this.voiceService = voiceService;
+    console.log('✅ Voice service connected to Discord service');
   }
 
   // Join voice channel with connection limit checking
