@@ -120,6 +120,8 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
 
   // Debug favorite voices
   console.log('Favorite voices data:', favoriteVoices);
+  console.log('Current voiceId:', voiceId);
+  console.log('Current voiceProvider:', voiceProvider);
 
   // Update settings mutation
   const updateSettingsMutation = useMutation({
@@ -232,16 +234,17 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
       setVoiceId('21m00Tcm4TlvDq8ikWAM'); // Default ElevenLabs voice
     } else if (provider === 'favorite' && (favoriteVoices as any)?.voices?.length > 0) {
       const currentVoiceIsFavorite = (favoriteVoices as any).voices.some((voice: any) =>
-        voice.voiceId === voiceId
+        (voice.baseVoiceId || voice.voiceId) === voiceId
       );
       
       if (!currentVoiceIsFavorite) {
-        setVoiceId((favoriteVoices as any).voices[0].voiceId);
+        setVoiceId((favoriteVoices as any).voices[0].baseVoiceId || (favoriteVoices as any).voices[0].voiceId);
       }
     }
   };
 
   const handleVoiceIdChange = (id: string) => {
+    console.log('Voice ID changed to:', id);
     setVoiceId(id);
     setHasUnsavedVoiceChanges(true);
   };
@@ -456,7 +459,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
               </Label>
               {(favoriteVoices as any)?.voices?.length > 0 ? (
                 <Select 
-                  value={voiceId}
+                  value={voiceId || ""}
                   onValueChange={handleVoiceIdChange}
                   data-testid="select-favorite-voice"
                 >
@@ -465,7 +468,7 @@ export default function UnifiedSettings({ userId, settings, user }: UnifiedSetti
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
                     {(favoriteVoices as any).voices.map((voice: any) => (
-                      <SelectItem key={voice.id} value={voice.voiceId}>
+                      <SelectItem key={voice.id} value={voice.baseVoiceId || voice.voiceId}>
                         <div className="flex items-center space-x-2">
                           <Star className="h-3 w-3 text-yellow-400" />
                           <span>{voice.name}</span>
