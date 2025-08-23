@@ -13,6 +13,6 @@ execSync('vite build', { stdio: 'inherit' });
 
 // Build the server
 console.log('⚙️ Building server...');
-execSync('npx esbuild server/index.ts --bundle --platform=node --target=node18 --outfile=dist/server/index.js --external:pg-native --external:ffmpeg-static --external:@replit/vite-plugin-cartographer --external:@mapbox/node-pre-gyp --external:@babel/preset-typescript --external:lightningcss --external:@babel/core --external:vite', { stdio: 'inherit' });
+execSync('npx esbuild server/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server/index.js --external:pg-native --external:ffmpeg-static --external:@replit/vite-plugin-cartographer --external:@mapbox/node-pre-gyp --external:@babel/preset-typescript --external:lightningcss --external:@babel/core --external:vite', { stdio: 'inherit' });
 
 console.log('✅ Build completed!');
