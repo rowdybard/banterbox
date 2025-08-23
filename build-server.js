@@ -7,27 +7,9 @@ import path from 'path';
 
 console.log('🔨 Building server...');
 
-// Run the database migration first
-console.log('🔄 Running database migration...');
-try {
-  execSync('node migrate-db.js', { stdio: 'inherit' });
-  console.log('✅ Database migration completed');
-} catch (error) {
-  console.log('⚠️ Database migration failed (this is normal if columns already exist):', error.message);
-}
-
-// Run marketplace migration
-console.log('🔄 Running marketplace migration...');
-try {
-  execSync('node migrate-marketplace.js', { stdio: 'inherit' });
-  console.log('✅ Marketplace migration completed');
-} catch (error) {
-  console.log('⚠️ Marketplace migration failed (this is normal if tables already exist):', error.message);
-}
-
 // Build the client
 console.log('🏗️ Building client...');
-execSync('npm run build', { stdio: 'inherit' });
+execSync('vite build', { stdio: 'inherit' });
 
 // Build the server
 console.log('⚙️ Building server...');
