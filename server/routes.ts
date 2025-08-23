@@ -286,25 +286,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const factualResponse = response.choices[0].message.content || "I don't have enough context to answer that question.";
         
-        // Record the AI response for future context
-        if (contextualUserId) {
+        // Record the factual response for future context
+        if (contextId) {
           try {
-            await ContextService.recordEvent(
-              contextualUserId,
-              'ai_response',
-              {
-                displayName: 'BanterBox',
-                username: 'banterbox',
-                message: factualResponse,
-                messageContent: factualResponse
-              },
-              guildId,
-              5, // High importance for AI responses
-              factualResponse
-            );
-            console.log(`Recorded AI response to context: "${factualResponse.substring(0, 50)}..."`);
+            await ContextService.updateContextResponse(contextId, factualResponse);
           } catch (contextError) {
-            console.error('Error recording AI response to context:', contextError);
+            console.error('Error updating context response:', contextError);
           }
         }
         
@@ -391,25 +378,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const banterResponse = response.choices[0]?.message?.content || "Thanks for the interaction!";
       
-      // Record the AI response for future context
-      if (contextualUserId) {
+      // Record the AI's response for future context
+      if (contextId) {
         try {
-          await ContextService.recordEvent(
-            contextualUserId,
-            'ai_response',
-            {
-              displayName: 'BanterBox',
-              username: 'banterbox',
-              message: banterResponse,
-              messageContent: banterResponse
-            },
-            guildId,
-            5, // High importance for AI responses
-            banterResponse
-          );
-          console.log(`Recorded AI response to context: "${banterResponse.substring(0, 50)}..."`);
+          await ContextService.updateContextResponse(contextId, banterResponse);
         } catch (contextError) {
-          console.error('Error recording AI response to context:', contextError);
+          console.error('Error updating context response:', contextError);
+          // Don't fail banter generation if context update fails
         }
       }
       
@@ -435,8 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             responseType: isDirectQuestionResult ? 'factual' : 'personality',
             questionAsked: originalMessage || undefined,
             wasDirectQuestion: isDirectQuestionResult,
-            confidence: isDirectQuestionResult ? 8 : 5,
-            expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000) // 72 hours
+            confidence: isDirectQuestionResult ? 8 : 5
           });
           console.log(`Recorded AI response for intelligent detection: ${banterResponse.substring(0, 50)}...`);
         } catch (error) {
