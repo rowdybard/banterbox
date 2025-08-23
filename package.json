@@ -100,7 +100,6 @@
     "vaul": "^1.1.2",
     "vite": "^5.4.19",
     "@vitejs/plugin-react": "^4.3.2",
-    "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "esbuild": "^0.25.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
