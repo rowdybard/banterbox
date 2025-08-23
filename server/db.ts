@@ -4,6 +4,11 @@ import * as schema from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
   console.error("❌ DATABASE_URL must be set. Did you forget to provision a database?");
+  console.log("📝 Please create a PostgreSQL database and set DATABASE_URL");
+  console.log("📝 Options:");
+  console.log("   - Create PostgreSQL in Render dashboard");
+  console.log("   - Use Supabase (free): https://supabase.com");
+  console.log("   - Use Railway (free): https://railway.app");
   // Don't throw - let the server start without database
   console.log("📝 Server will start without database functionality");
 }
